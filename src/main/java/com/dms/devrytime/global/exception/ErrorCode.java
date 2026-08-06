@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum ErrorCode {
 
+    VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "입력 값이 올바르지 않습니다."),
+    INVALID_PARAMETER_TYPE(HttpStatus.BAD_REQUEST, "INVALID_PARAMETER_TYPE", "유효하지 않은 요청입니다."),
+
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요한 서비스입니다."),
 
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 작업을 수행할 권한이 없습니다."),
