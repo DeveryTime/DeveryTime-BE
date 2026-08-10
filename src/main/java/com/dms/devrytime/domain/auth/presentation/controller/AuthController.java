@@ -1,8 +1,11 @@
 package com.dms.devrytime.domain.auth.presentation.controller;
 
 import com.dms.devrytime.domain.auth.application.LoginService;
+import com.dms.devrytime.domain.auth.application.LogoutService;
+import com.dms.devrytime.domain.auth.application.ReissueService;
 import com.dms.devrytime.domain.auth.application.SignupService;
 import com.dms.devrytime.domain.auth.presentation.dto.request.LoginRequest;
+import com.dms.devrytime.domain.auth.presentation.dto.request.ReissueRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.request.SignupRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.response.TokenResponse;
 import com.dms.devrytime.global.response.ApiResponse;
@@ -18,6 +21,8 @@ public class AuthController {
 
     private final SignupService signupService;
     private final LoginService loginService;
+    private final ReissueService reissueService;
+    private final LogoutService logoutService;
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
@@ -30,6 +35,7 @@ public class AuthController {
 
     @GetMapping("/check-username")
     public ApiResponse<Void> checkUsername(@RequestParam String username){
+
         signupService.checkUsername(username);
         return ApiResponse.successMessage("사용 가능한 아이디입니다.");
     }
@@ -41,4 +47,13 @@ public class AuthController {
         TokenResponse response = loginService.login(request);
         return ApiResponse.success(response, "로그인 되었습니다.");
     }
+
+    @PostMapping("/reissue")
+    public ApiResponse<TokenResponse> reissue(
+            @RequestBody @Valid ReissueRequest request){
+
+        TokenResponse response = reissueService.reissue(request);
+        return ApiResponse.success(response);
+    }
+
 }

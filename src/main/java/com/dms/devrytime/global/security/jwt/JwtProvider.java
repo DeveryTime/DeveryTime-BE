@@ -87,4 +87,11 @@ public class JwtProvider {
         return expiration.toInstant()
                 .atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
     }
+
+    public void validateRefreshToken(String token){
+        String type = getClaims(token).get("type", String.class);
+
+        if (!REFRESH_TOKEN.equals(type))
+            throw new DevryTimeException(ErrorCode.TOKEN_INVALID);
+    }
 }
