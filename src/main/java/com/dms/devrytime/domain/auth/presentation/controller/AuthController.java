@@ -5,13 +5,16 @@ import com.dms.devrytime.domain.auth.application.LogoutService;
 import com.dms.devrytime.domain.auth.application.ReissueService;
 import com.dms.devrytime.domain.auth.application.SignupService;
 import com.dms.devrytime.domain.auth.presentation.dto.request.LoginRequest;
+import com.dms.devrytime.domain.auth.presentation.dto.request.LogoutRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.request.ReissueRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.request.SignupRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.response.TokenResponse;
 import com.dms.devrytime.global.response.ApiResponse;
+import com.dms.devrytime.global.security.auth.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -56,4 +59,12 @@ public class AuthController {
         return ApiResponse.success(response);
     }
 
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody @Valid LogoutRequest request){
+
+        logoutService.logout(request, userDetails.getUserId());
+        return ApiResponse.successMessage("로그아웃 되었습니다.");
+    }
 }
