@@ -5,7 +5,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
@@ -27,7 +26,7 @@ public class User {
     @Column(nullable = false, length = 4)
     private String schoolNumber;
 
-    @Column(nullable = false, length = 10)
+    @Column(nullable = false, length = 30)
     private String name;
 
     @Column(nullable = false, length = 10, unique = true)
@@ -42,8 +41,8 @@ public class User {
     private String profileImageUrl;
 
     @Builder
-    public User(String schoolNumber, String name, String email, String username, String passwordHash){
-        this.schoolYear = LocalDate.now().getYear();
+    public User(int schoolYear, String schoolNumber, String name, String email, String username, String passwordHash){
+        this.schoolYear = schoolYear;
         this.schoolNumber = schoolNumber;
         this.name = name;
         this.email = email;
