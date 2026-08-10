@@ -46,4 +46,9 @@ public class SignupService {
 
         userRepository.save(user);
     }
+
+    public void checkUsername(String username){
+        if (userRepository.existsByUsername(username))
+            throw new DevryTimeException(ErrorCode.USERNAME_ALREADY_EXISTS);
+    }
 }

@@ -23,4 +23,10 @@ public class AuthController {
         signupService.signup(request);
         return ApiResponse.successMessage("회원가입이 완료되었습니다.");
     }
+
+    @GetMapping("/check-username")
+    public ApiResponse<Void> checkUsername(@RequestParam String username){
+        signupService.checkUsername(username);
+        return ApiResponse.successMessage("사용 가능한 아이디입니다.");
+    }
 }
