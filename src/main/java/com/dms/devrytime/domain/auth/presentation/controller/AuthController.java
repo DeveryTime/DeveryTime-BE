@@ -1,7 +1,10 @@
 package com.dms.devrytime.domain.auth.presentation.controller;
 
+import com.dms.devrytime.domain.auth.application.LoginService;
 import com.dms.devrytime.domain.auth.application.SignupService;
+import com.dms.devrytime.domain.auth.presentation.dto.request.LoginRequest;
 import com.dms.devrytime.domain.auth.presentation.dto.request.SignupRequest;
+import com.dms.devrytime.domain.auth.presentation.dto.response.TokenResponse;
 import com.dms.devrytime.global.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final SignupService signupService;
+    private final LoginService loginService;
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
@@ -28,5 +32,13 @@ public class AuthController {
     public ApiResponse<Void> checkUsername(@RequestParam String username){
         signupService.checkUsername(username);
         return ApiResponse.successMessage("사용 가능한 아이디입니다.");
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<TokenResponse> login(
+            @RequestBody @Valid LoginRequest request){
+
+        TokenResponse response = loginService.login(request);
+        return ApiResponse.success(response, "로그인 되었습니다.");
     }
 }

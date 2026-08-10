@@ -14,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 
 @Component
@@ -77,5 +79,12 @@ public class JwtProvider {
         return new UsernamePasswordAuthenticationToken(
                 userDetails, null, userDetails.getAuthorities()
         );
+    }
+
+    public LocalDateTime getExpiration(String token){
+        Date expiration = getClaims(token).getExpiration();
+
+        return expiration.toInstant()
+                .atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
     }
 }
