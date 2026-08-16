@@ -1,7 +1,7 @@
 package com.dms.devrytime.domain.auth.application;
 
-import com.dms.devrytime.domain.auth.domain.RefreshToken;
-import com.dms.devrytime.domain.auth.domain.RefreshTokenRepository;
+import com.dms.devrytime.domain.auth.domain.refreshtoken.RefreshToken;
+import com.dms.devrytime.domain.auth.domain.refreshtoken.RefreshTokenRepository;
 import com.dms.devrytime.domain.auth.presentation.dto.request.LogoutRequest;
 import com.dms.devrytime.global.exception.DevryTimeException;
 import com.dms.devrytime.global.exception.ErrorCode;

@@ -1,4 +1,4 @@
-package com.dms.devrytime.domain.auth.domain;
+package com.dms.devrytime.domain.auth.domain.refreshtoken;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
