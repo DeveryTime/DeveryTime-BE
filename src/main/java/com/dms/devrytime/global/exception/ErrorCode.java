@@ -26,6 +26,7 @@ public enum ErrorCode {
     SCHOOL_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "SCHOOL_NUMBER_ALREADY_EXISTS", "이미 사용중인 학번입니다."),
 
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+    EMAIL_VERIFICATION_TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "EMAIL_VERIFICATION_TOO_MANY_REQUESTS", "인증 코드는 1분 후 다시 요청할 수 있습니다."),
 
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 측 오류가 발생했습니다."),
 
