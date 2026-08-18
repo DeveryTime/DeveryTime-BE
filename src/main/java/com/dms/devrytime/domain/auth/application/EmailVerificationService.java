@@ -64,7 +64,7 @@ public class EmailVerificationService {
         if (verification.getRequestWindowStartedAt().plusMinutes(10).isBefore(now))
             verification.resetRequestWindow(now);
         else {
-            if (verification.getRequestCount() >= 3)
+            if (verification.getRequestCount() >= 5)
                 throw new DevryTimeException(ErrorCode.TOO_MANY_REQUESTS);
 
             verification.increaseRequestCount();
