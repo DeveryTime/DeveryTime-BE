@@ -1,5 +1,7 @@
 package com.dms.devrytime.domain.auth.application;
 
+import com.dms.devrytime.domain.auth.domain.emailverification.EmailVerification;
+import com.dms.devrytime.domain.auth.domain.emailverification.EmailVerificationRepository;
 import com.dms.devrytime.domain.auth.presentation.dto.request.SignupRequest;
 import com.dms.devrytime.domain.user.domain.User;
 import com.dms.devrytime.domain.user.domain.UserRepository;
@@ -9,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDate;
 
 @Service
@@ -19,6 +20,7 @@ public class SignupService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationRepository emailVerificationRepository;
 
     public void signup(SignupRequest request){
         if(userRepository.existsByEmail(request.email()))
@@ -35,6 +37,13 @@ public class SignupService {
         if (userRepository.existsBySchoolNumberAndSchoolYear(request.schoolNumber(), schoolYear))
             throw new DevryTimeException(ErrorCode.SCHOOL_NUMBER_ALREADY_EXISTS);
 
+        EmailVerification verification =
+                emailVerificationRepository.findByEmail(request.email())
+                        .orElseThrow(() -> new DevryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
+
+        if (!verification.isVerified())
+            throw new DevryTimeException(ErrorCode.EMAIL_NOT_VERIFIED);
+
         User user = User.builder()
                 .email(request.email())
                 .name(request.name())
@@ -45,6 +54,7 @@ public class SignupService {
                 .build();
 
         userRepository.save(user);
+        emailVerificationRepository.delete(verification);
     }
 
     public void checkUsername(String username){
