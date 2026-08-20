@@ -38,7 +38,7 @@ public class EmailVerificationVerifyService {
         if (verification.isVerified())
             throw new DevryTimeException(ErrorCode.EMAIL_ALREADY_VERIFIED);
 
-        if (verification.getExpiresAt().isBefore(now))
+        if (!verification.getExpiresAt().isAfter(now))
             throw new DevryTimeException(ErrorCode.VERIFICATION_CODE_EXPIRED);
 
         if (verification.getVerificationAttemptCount() >= 5)
