@@ -1,20 +1,27 @@
 package com.dms.devrytime.domain.auth.infrastructure;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class EmailSender {
 
     private final JavaMailSender javaMailSender;
+    private final String from;
+
+    public EmailSender(JavaMailSender javaMailSender,
+                       @Value("${app.mail.from}") String from){
+        this.javaMailSender = javaMailSender;
+        this.from = from;
+    }
 
     public void sendVerificationCode(String email, String code){
 
         SimpleMailMessage message = new SimpleMailMessage();
-        
+
+        message.setFrom(from);
         message.setTo(email);
         message.setSubject("[DevryTime] 이메일 인증 코드");
         message.setText("인증 코드는 "+ code + "입니다. \n" +
