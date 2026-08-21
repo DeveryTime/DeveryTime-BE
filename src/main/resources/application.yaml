@@ -1,6 +1,6 @@
 spring:
   application:
-    name: devrytime-be
+    name: deverytime-be
 
   datasource:
     url: ${DB_URL}
