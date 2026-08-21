@@ -23,7 +23,7 @@ public class EmailSender {
 
         message.setFrom(from);
         message.setTo(email);
-        message.setSubject("[DevryTime] 이메일 인증 코드");
+        message.setSubject("[DeveryTime] 이메일 인증 코드");
         message.setText("인증 코드는 "+ code + "입니다. \n" +
                         "해당 인증 코드는 5분동안 유효합니다.");
 
