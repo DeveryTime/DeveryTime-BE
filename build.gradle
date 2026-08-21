@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.dms'
 version = '0.0.1-SNAPSHOT'
-description = 'devrytime-be'
+description = 'deverytime-be'
 
 java {
     toolchain {
