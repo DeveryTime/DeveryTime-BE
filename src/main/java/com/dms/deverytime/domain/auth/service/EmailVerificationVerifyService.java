@@ -11,11 +11,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
-@Transactional(noRollbackFor = DeveryTimeException.class)
+@Transactional
 @RequiredArgsConstructor
 public class EmailVerificationVerifyService {
 
     private final EmailVerificationRepository emailVerificationRepository;
+    private final EmailVerificationAttemptService emailVerificationAttemptService;
 
     public void verifyEmailCode(VerifyEmailRequest request){
 
@@ -46,9 +47,8 @@ public class EmailVerificationVerifyService {
 
     private void validateCode(EmailVerification verification, String code){
         if (!verification.getCode().equals(code)) {
-            verification.increaseVerificationAttemptCount();
 
-            if (verification.getVerificationAttemptCount() >= 5)
+            if (emailVerificationAttemptService.increaseAttemptCount(verification.getId()) >= 5)
                 throw new DeveryTimeException(ErrorCode.VERIFICATION_ATTEMPT_EXCEEDED);
 
             throw new DeveryTimeException(ErrorCode.INVALID_VERIFICATION_CODE);
