@@ -49,4 +49,13 @@ public class User {
         this.username = username;
         this.passwordHash = passwordHash;
     }
+
+    public void usernameUpdate(String username){
+        this.username = username;
+        this.usernameUpdatedAt = LocalDateTime.now();
+    }
+
+    public void profileImgUpdate(String profileImageUrl){
+        this.profileImageUrl = profileImageUrl;
+    }
 }
