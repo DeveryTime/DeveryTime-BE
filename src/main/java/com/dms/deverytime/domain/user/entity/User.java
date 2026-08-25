@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.user.domain;
+package com.dms.deverytime.domain.user.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;

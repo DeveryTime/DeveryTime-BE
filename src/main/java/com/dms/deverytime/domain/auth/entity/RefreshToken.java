@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.domain;
+package com.dms.deverytime.domain.auth.entity;
 
 import com.dms.deverytime.global.entity.BaseCreatedEntity;
 import jakarta.persistence.*;

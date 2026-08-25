@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.presentation.dto.request;
+package com.dms.deverytime.domain.auth.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

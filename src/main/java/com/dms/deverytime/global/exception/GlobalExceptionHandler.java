@@ -5,6 +5,7 @@ import com.dms.deverytime.global.exception.response.ErrorDetail;
 import com.dms.deverytime.global.exception.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -42,6 +43,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTypeMismatchException(MethodArgumentTypeMismatchException e){
 
         ErrorCode errorCode = ErrorCode.INVALID_PARAMETER_TYPE;
+        ErrorResponse response = ErrorResponse.of(ErrorData.from(errorCode));
+
+        return ResponseEntity.status(errorCode.getHttpStatus()).body(response);
+    }
+
+    @ExceptionHandler(MailException.class)
+    public ResponseEntity<ErrorResponse> handleMailException(MailException e){
+
+        ErrorCode errorCode = ErrorCode.SERVICE_UNAVAILABLE;
         ErrorResponse response = ErrorResponse.of(ErrorData.from(errorCode));
 
         return ResponseEntity.status(errorCode.getHttpStatus()).body(response);

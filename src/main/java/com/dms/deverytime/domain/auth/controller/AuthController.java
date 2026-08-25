@@ -1,14 +1,14 @@
-package com.dms.deverytime.domain.auth.presentation.controller;
+package com.dms.deverytime.domain.auth.controller;
 
-import com.dms.deverytime.domain.auth.application.LoginService;
-import com.dms.deverytime.domain.auth.application.LogoutService;
-import com.dms.deverytime.domain.auth.application.ReissueService;
-import com.dms.deverytime.domain.auth.application.SignupService;
-import com.dms.deverytime.domain.auth.presentation.dto.request.LoginRequest;
-import com.dms.deverytime.domain.auth.presentation.dto.request.LogoutRequest;
-import com.dms.deverytime.domain.auth.presentation.dto.request.ReissueRequest;
-import com.dms.deverytime.domain.auth.presentation.dto.request.SignupRequest;
-import com.dms.deverytime.domain.auth.presentation.dto.response.TokenResponse;
+import com.dms.deverytime.domain.auth.service.LoginService;
+import com.dms.deverytime.domain.auth.service.LogoutService;
+import com.dms.deverytime.domain.auth.service.ReissueService;
+import com.dms.deverytime.domain.auth.service.SignupService;
+import com.dms.deverytime.domain.auth.dto.request.LoginRequest;
+import com.dms.deverytime.domain.auth.dto.request.LogoutRequest;
+import com.dms.deverytime.domain.auth.dto.request.ReissueRequest;
+import com.dms.deverytime.domain.auth.dto.request.SignupRequest;
+import com.dms.deverytime.domain.auth.dto.response.TokenResponse;
 import com.dms.deverytime.global.response.ApiResponse;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
 import jakarta.validation.Valid;

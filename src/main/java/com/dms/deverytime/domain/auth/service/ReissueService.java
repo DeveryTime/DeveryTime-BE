@@ -1,15 +1,15 @@
-package com.dms.deverytime.domain.auth.application;
+package com.dms.deverytime.domain.auth.service;
 
-import com.dms.deverytime.domain.auth.domain.RefreshToken;
-import com.dms.deverytime.domain.auth.domain.RefreshTokenRepository;
-import com.dms.deverytime.domain.auth.presentation.dto.request.ReissueRequest;
-import com.dms.deverytime.domain.auth.presentation.dto.response.TokenResponse;
+import com.dms.deverytime.domain.auth.dto.request.ReissueRequest;
+import com.dms.deverytime.domain.auth.dto.response.TokenResponse;
+import com.dms.deverytime.domain.auth.entity.RefreshToken;
+import com.dms.deverytime.domain.auth.repository.RefreshTokenRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import com.dms.deverytime.global.security.jwt.JwtProvider;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional

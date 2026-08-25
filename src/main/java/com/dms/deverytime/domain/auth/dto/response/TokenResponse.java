@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.presentation.dto.response;
+package com.dms.deverytime.domain.auth.dto.response;
 
 public record TokenResponse(
         String accessToken,

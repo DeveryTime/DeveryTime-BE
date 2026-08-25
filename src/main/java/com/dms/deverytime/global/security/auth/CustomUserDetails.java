@@ -1,6 +1,6 @@
 package com.dms.deverytime.global.security.auth;
 
-import com.dms.deverytime.domain.user.domain.User;
+import com.dms.deverytime.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

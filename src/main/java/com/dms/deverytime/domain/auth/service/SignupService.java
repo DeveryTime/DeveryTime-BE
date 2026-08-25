@@ -1,14 +1,16 @@
-package com.dms.deverytime.domain.auth.application;
+package com.dms.deverytime.domain.auth.service;
 
-import com.dms.deverytime.domain.auth.presentation.dto.request.SignupRequest;
-import com.dms.deverytime.domain.user.domain.User;
-import com.dms.deverytime.domain.user.domain.UserRepository;
+import com.dms.deverytime.domain.auth.dto.request.SignupRequest;
+import com.dms.deverytime.domain.auth.entity.EmailVerification;
+import com.dms.deverytime.domain.auth.repository.EmailVerificationRepository;
+import com.dms.deverytime.domain.user.entity.User;
+import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -19,6 +21,7 @@ public class SignupService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailVerificationRepository emailVerificationRepository;
 
     public void signup(SignupRequest request){
         if(userRepository.existsByEmail(request.email()))
@@ -35,6 +38,13 @@ public class SignupService {
         if (userRepository.existsBySchoolNumberAndSchoolYear(request.schoolNumber(), schoolYear))
             throw new DeveryTimeException(ErrorCode.SCHOOL_NUMBER_ALREADY_EXISTS);
 
+        EmailVerification verification =
+                emailVerificationRepository.findByEmail(request.email())
+                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
+
+        if (!verification.isVerified())
+            throw new DeveryTimeException(ErrorCode.EMAIL_NOT_VERIFIED);
+
         User user = User.builder()
                 .email(request.email())
                 .name(request.name())
@@ -45,6 +55,7 @@ public class SignupService {
                 .build();
 
         userRepository.save(user);
+        emailVerificationRepository.delete(verification);
     }
 
     public void checkUsername(String username){
