@@ -40,6 +40,8 @@ public class User {
     @Column(length = 500)
     private String profileImageUrl;
 
+    private String profileImagePublicId;
+
     @Builder
     public User(int schoolYear, String schoolNumber, String name, String email, String username, String passwordHash){
         this.schoolYear = schoolYear;
@@ -55,7 +57,8 @@ public class User {
         this.usernameUpdatedAt = LocalDateTime.now();
     }
 
-    public void profileImgUpdate(String profileImageUrl){
+    public void profileImgUpdate(String profileImageUrl, String profileImagePublicId){
         this.profileImageUrl = profileImageUrl;
+        this.profileImagePublicId = profileImagePublicId;
     }
 }
