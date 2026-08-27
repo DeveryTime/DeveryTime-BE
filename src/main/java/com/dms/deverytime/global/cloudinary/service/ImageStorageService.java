@@ -39,7 +39,7 @@ public class ImageStorageService {
 
     public void delete(String publicId){
         try {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
         } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         }
