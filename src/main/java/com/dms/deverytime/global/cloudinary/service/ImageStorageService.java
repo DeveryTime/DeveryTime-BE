@@ -14,7 +14,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-public class ImageUploadService {
+public class ImageStorageService {
 
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
@@ -22,22 +22,25 @@ public class ImageUploadService {
 
     public ImageUploadResult upload(MultipartFile file, String folder){
 
+        Map uploadResult;
         validateImage(file);
+
         try {
-            Map uploadResult = cloudinary.uploader().upload(
+            uploadResult = cloudinary.uploader().upload(
                     file.getBytes(), ObjectUtils.asMap("folder", folder));
 
-            return ImageUploadResult.of(uploadResult.get("secure_url").toString(),
-                    uploadResult.get("public_id").toString());
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
         }
+
+        return ImageUploadResult.of(uploadResult.get("secure_url").toString(),
+                uploadResult.get("public_id").toString());
     }
 
     public void delete(String publicId){
         try {
             cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         }
     }

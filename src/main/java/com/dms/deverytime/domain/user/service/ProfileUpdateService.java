@@ -4,7 +4,7 @@ import com.dms.deverytime.domain.user.dto.request.UpdateProfileRequest;
 import com.dms.deverytime.domain.user.entity.User;
 import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.cloudinary.dto.ImageUploadResult;
-import com.dms.deverytime.global.cloudinary.service.ImageUploadService;
+import com.dms.deverytime.global.cloudinary.service.ImageStorageService;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class ProfileUpdateService {
 
     private final UserRepository userRepository;
-    private final ImageUploadService imageUploadService;
+    private final ImageStorageService imageUploadService;
     private static final String PROFILE_IMAGE_FOLDER = "profile";
 
     public void updateProfile(Long userId, UpdateProfileRequest request, MultipartFile profileImg){
