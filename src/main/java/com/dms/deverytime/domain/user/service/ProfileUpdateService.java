@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class ProfileUpdateService {
 
     private final UserRepository userRepository;
-    private final ImageStorageService imageUploadService;
+    private final ImageStorageService imageStorageService;
     private static final String PROFILE_IMAGE_FOLDER = "profile";
 
     public void updateProfile(Long userId, UpdateProfileRequest request, MultipartFile profileImg){
@@ -45,16 +45,26 @@ public class ProfileUpdateService {
 
         if (request.deleteProfileImage()){
             if (user.getProfileImagePublicId() != null)
-                imageUploadService.delete(user.getProfileImagePublicId());
+                imageStorageService.delete(user.getProfileImagePublicId());
             user.profileImgUpdate(null, null);
         }
         else if (profileImg != null && !profileImg.isEmpty()){
+
             ImageUploadResult result =
-                    imageUploadService.upload(profileImg, PROFILE_IMAGE_FOLDER);
+                    imageStorageService.upload(profileImg, PROFILE_IMAGE_FOLDER);
 
-            if (user.getProfileImagePublicId() != null)
-                imageUploadService.delete(user.getProfileImagePublicId());
+            try {
+                if (user.getProfileImagePublicId() != null)
+                    imageStorageService.delete(user.getProfileImagePublicId());
+            } catch (DeveryTimeException e) {
+                try {
+                    imageStorageService.delete(result.profileImagePublicId());
+                } catch (DeveryTimeException cleanupException) {
+                    e.addSuppressed(cleanupException);
+                }
 
+                throw  e;
+            }
             user.profileImgUpdate(result.profileImageUrl(), result.profileImagePublicId());
         }
     }
