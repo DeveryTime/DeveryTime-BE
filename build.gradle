@@ -43,6 +43,9 @@ dependencies {
     // Cloudinary
     implementation 'com.cloudinary:cloudinary-http5:2.0.0'
 
+    // Apache Tika
+    implementation 'org.apache.tika:tika-core:3.2.3'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
