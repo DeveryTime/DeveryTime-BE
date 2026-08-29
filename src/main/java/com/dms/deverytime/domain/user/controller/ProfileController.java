@@ -21,7 +21,7 @@ public class ProfileController {
     private final ProfileQueryService profileQueryService;
     private final ProfileUpdateService profileUpdateService;
 
-    @PostMapping
+    @GetMapping
     public ApiResponse<ProfileDataResponse> getProfile
             (@AuthenticationPrincipal  CustomUserDetails userDetails){
         ProfileDataResponse response =
