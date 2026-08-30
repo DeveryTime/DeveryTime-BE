@@ -26,46 +26,59 @@ public class ProfileUpdateService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.USER_NOT_FOUND));
 
-        boolean usernameChanged =
-                request.username() != null &&
-                        !user.getUsername().equals(request.username());
+        updateUsername(user, request.username());
+        updateProfileImage(user, request.deleteProfileImage(), profileImg);
+    }
+
+    private void updateUsername(User user, String username){
+        if (username == null || user.getUsername().equals(username))
+            return;
 
         LocalDateTime now = LocalDateTime.now();
 
-        if (usernameChanged){
-            if (user.getUsernameUpdatedAt() != null
-                    && user.getUsernameUpdatedAt().plusHours(24).isAfter(now))
-                throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
+        if (user.getUsernameUpdatedAt() != null
+                && user.getUsernameUpdatedAt().plusHours(24).isAfter(now))
+            throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
 
-            if (userRepository.existsByUsername(request.username()))
-                throw new DeveryTimeException(ErrorCode.USERNAME_ALREADY_EXISTS);
+        if (userRepository.existsByUsername(username))
+            throw new DeveryTimeException(ErrorCode.USERNAME_ALREADY_EXISTS);
 
-            user.usernameUpdate(request.username());
-        }
+        user.usernameUpdate(username);
+    }
 
-        if (request.deleteProfileImage()){
+    private void deleteProfileImage(User user){
+        if (user.getProfileImagePublicId() != null)
+            imageStorageService.delete(user.getProfileImagePublicId());
+
+        user.profileImgUpdate(null, null);
+    }
+
+    private void replaceProfileImage(User user, MultipartFile profileImg){
+        ImageUploadResult result =
+                imageStorageService.upload(profileImg, PROFILE_IMAGE_FOLDER);
+
+        try {
             if (user.getProfileImagePublicId() != null)
                 imageStorageService.delete(user.getProfileImagePublicId());
-            user.profileImgUpdate(null, null);
-        }
-        else if (profileImg != null && !profileImg.isEmpty()){
-
-            ImageUploadResult result =
-                    imageStorageService.upload(profileImg, PROFILE_IMAGE_FOLDER);
-
+        } catch (DeveryTimeException e) {
             try {
-                if (user.getProfileImagePublicId() != null)
-                    imageStorageService.delete(user.getProfileImagePublicId());
-            } catch (DeveryTimeException e) {
-                try {
-                    imageStorageService.delete(result.profileImagePublicId());
-                } catch (DeveryTimeException cleanupException) {
-                    e.addSuppressed(cleanupException);
-                }
-
-                throw  e;
+                imageStorageService.delete(result.profileImagePublicId());
+            } catch (DeveryTimeException cleanupException) {
+                e.addSuppressed(cleanupException);
             }
-            user.profileImgUpdate(result.profileImageUrl(), result.profileImagePublicId());
+            throw  e;
+        }
+
+        user.profileImgUpdate(result.profileImageUrl(), result.profileImagePublicId());
+    }
+
+    private void updateProfileImage(User user, boolean deleteProfileImage, MultipartFile profileImg){
+        if (deleteProfileImage){
+            deleteProfileImage(user);
+        }
+
+        else if (profileImg != null && !profileImg.isEmpty()){
+            replaceProfileImage(user, profileImg);
         }
     }
 }
