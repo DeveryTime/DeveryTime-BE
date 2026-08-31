@@ -55,6 +55,15 @@ public class User {
     }
 
     public void usernameUpdate(String username){
+        if (username == null || this.username.equals(username))
+            return;
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (this.usernameUpdatedAt != null
+                && this.usernameUpdatedAt.plusHours(24).isAfter(now))
+            throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
+
         this.username = username;
         this.usernameUpdatedAt = LocalDateTime.now();
     }
@@ -64,16 +73,4 @@ public class User {
         this.profileImagePublicId = profileImagePublicId;
     }
 
-    public boolean validateAndCheckUsernameChange(String username){
-        if (username == null || this.username.equals(username))
-            return false;
-
-        LocalDateTime now = LocalDateTime.now();
-
-        if (this.usernameUpdatedAt != null
-                && this.usernameUpdatedAt.plusHours(24).isAfter(now))
-            throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
-
-        return true;
-    }
 }

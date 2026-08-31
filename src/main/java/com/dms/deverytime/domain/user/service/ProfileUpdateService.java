@@ -31,9 +31,9 @@ public class ProfileUpdateService {
 
     private void updateUsername(User user, String username){
 
-        if (!user.validateAndCheckUsernameChange(username)) return;
+        if (username == null) return;
 
-        if (userRepository.existsByUsername(username))
+        if (userRepository.existsByUsernameAndIdNot(username, user.getId()))
             throw new DeveryTimeException(ErrorCode.USERNAME_ALREADY_EXISTS);
 
         user.usernameUpdate(username);
