@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import java.time.LocalDateTime;
 
 @Service
 @Transactional
@@ -31,14 +30,8 @@ public class ProfileUpdateService {
     }
 
     private void updateUsername(User user, String username){
-        if (username == null || user.getUsername().equals(username))
-            return;
 
-        LocalDateTime now = LocalDateTime.now();
-
-        if (user.getUsernameUpdatedAt() != null
-                && user.getUsernameUpdatedAt().plusHours(24).isAfter(now))
-            throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
+        if (!user.validateAndCheckUsernameChange(username)) return;
 
         if (userRepository.existsByUsername(username))
             throw new DeveryTimeException(ErrorCode.USERNAME_ALREADY_EXISTS);

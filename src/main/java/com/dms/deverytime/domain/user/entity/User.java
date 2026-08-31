@@ -1,5 +1,7 @@
 package com.dms.deverytime.domain.user.entity;
 
+import com.dms.deverytime.global.exception.DeveryTimeException;
+import com.dms.deverytime.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -60,5 +62,18 @@ public class User {
     public void profileImgUpdate(String profileImageUrl, String profileImagePublicId){
         this.profileImageUrl = profileImageUrl;
         this.profileImagePublicId = profileImagePublicId;
+    }
+
+    public boolean validateAndCheckUsernameChange(String username){
+        if (username == null || this.username.equals(username))
+            return false;
+
+        LocalDateTime now = LocalDateTime.now();
+
+        if (this.usernameUpdatedAt != null
+                && this.usernameUpdatedAt.plusHours(24).isAfter(now))
+            throw new DeveryTimeException(ErrorCode.USERNAME_CHANGE_LIMIT_EXCEEDED);
+
+        return true;
     }
 }
