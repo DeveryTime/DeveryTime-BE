@@ -70,14 +70,14 @@ public class PostService {
     @Transactional
     public PostDetailResponse getPostDetail(Long id, Long loginUserId) {
 
-        // 1. 게시글 조회 — 없으면 POST_NOT_FOUND
+        // 게시글 조회
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
-        // 2. 이 유저가 이 게시글을 이미 조회한 적 있는지 확인
+        // 조회 이력 확인
         boolean alreadyViewed = postViewLogRepository.existsByPostIdAndUserId(id, loginUserId);
 
-        // 3. 처음 보는 거면 조회수 증가 + 조회 로그 남기기
+        // 처음이면 조회수 ++
         if (!alreadyViewed) {
             post.increaseViewCount();
 
@@ -87,15 +87,13 @@ public class PostService {
             postViewLogRepository.save(new PostViewLog(post, viewer));
         }
 
-        // 4. 이 게시글에 달린 이미지 URL 목록 조회 (sortOrder 순으로)
+        // 이미지 URL 목록 조회
         List<String> imageUrls = postImageRepository.findByPostIdOrderBySortOrder(id)
                 .stream()
                 .map(PostImage::getImageUrl)
                 .toList();
 
-        // 5. DTO로 변환해서 반환
-        //    TODO: writerNickname에 name(실명) vs username(아이디) 중 뭘 쓸지 프론트 확인 필요
-        //    post.getUser(), post.getCategory()는 LAZY라서 여기서 실제 쿼리가 나감
+        // DTO로 변환
         return new PostDetailResponse(
                 post.getId(),
                 post.getTitle(),
@@ -110,5 +108,20 @@ public class PostService {
                 post.getUpdatedAt()
         );
     }
+
+    @Transactional
+    public void updatePost(Long postId, PostRequest request, Long loginUserId) {
+
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        // 본인 확인--- JWT로 뽑은 로그인 유저 id와 게시글 작성자 id 비교
+        if (!post.getUser().getId().equals(loginUserId)) {
+            throw new DeveryTimeException(ErrorCode.FORBIDDEN);
+        }
+
+        // 제목 내용 수정
+        post.update(request.getTitle(), request.getContent());
+    } // @PreUpdate가 수정일시 자동 반영, 더티체킹으로 별도 코드 X
 
 }
