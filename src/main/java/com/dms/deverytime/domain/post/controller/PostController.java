@@ -52,4 +52,14 @@ public class PostController {
         postService.updatePost(id, request, loginUserId);
         return ApiResponse.success("게시글이 수정되었습니다.");
     }
+
+    // 게시글 삭제
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deletePost(@PathVariable Long id,
+                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Long loginUserId = userDetails.getUserId();
+        postService.deletePost(id, loginUserId);
+        return ApiResponse.success("게시글이 삭제되었습니다.");
+    }
+
 }
