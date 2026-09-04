@@ -3,6 +3,7 @@ package com.dms.deverytime.domain.post.service;
 import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.post.dto.request.PostRequest;
+import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
 import com.dms.deverytime.domain.post.entity.Post;
@@ -110,7 +111,7 @@ public class PostService {
     }
 
     @Transactional
-    public void updatePost(Long postId, PostRequest request, Long loginUserId) {
+    public void updatePost(Long postId, PostUpdateRequest request, Long loginUserId) {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
@@ -126,7 +127,7 @@ public class PostService {
 
     @Transactional
     public void deletePost(Long postId, Long loginUserId) {
-제
+
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
