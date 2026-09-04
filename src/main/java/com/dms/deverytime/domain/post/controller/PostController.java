@@ -1,6 +1,7 @@
 package com.dms.deverytime.domain.post.controller;
 
 import com.dms.deverytime.domain.post.dto.request.PostRequest;
+import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
 import com.dms.deverytime.domain.post.repository.PostRepository;
@@ -42,7 +43,13 @@ public class PostController {
         return ApiResponse.success(response);
     }
 
-
-
-
+    // 게시글 수정
+    @PutMapping("/{id}")
+    public ApiResponse<Void> updatePost(@PathVariable Long id,
+                                        @RequestBody PostUpdateRequest request,
+                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        Long loginUserId = userDetails.getUserId();
+        postService.updatePost(id, request, loginUserId);
+        return ApiResponse.success("게시글이 수정되었습니다.");
+    }
 }
