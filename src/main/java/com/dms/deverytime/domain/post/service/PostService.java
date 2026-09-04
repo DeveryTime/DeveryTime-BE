@@ -124,4 +124,17 @@ public class PostService {
         post.update(request.getTitle(), request.getContent());
     } // @PreUpdate가 수정일시 자동 반영, 더티체킹으로 별도 코드 X
 
+    @Transactional
+    public void deletePost(Long postId, Long loginUserId) {
+제
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.getUser().getId().equals(loginUserId)) {
+            throw new DeveryTimeException(ErrorCode.FORBIDDEN);
+        }
+
+        postRepository.delete(post);
+    }
+
 }
