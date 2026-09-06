@@ -1,5 +1,6 @@
 package com.dms.deverytime.domain.comment.domain;
 
+import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.user.domain.User;
 import com.dms.deverytime.global.entity.BaseEntity;
 import jakarta.persistence.Column;
@@ -26,8 +27,9 @@ public class Comment extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "post_id", nullable = false)
-    private Long postId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -37,8 +39,8 @@ public class Comment extends BaseEntity {
     private String content;
 
     @Builder
-    public Comment(Long postId, User user, String content) {
-        this.postId = postId;
+    public Comment(Post post, User user, String content) {
+        this.post = post;
         this.user = user;
         this.content = content;
     }
