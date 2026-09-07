@@ -10,8 +10,8 @@ import com.dms.deverytime.domain.comment.presentation.dto.response.CommentListRe
 import com.dms.deverytime.domain.comment.presentation.dto.response.CommentUpdateResponse;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.repository.PostRepository;
-import com.dms.deverytime.domain.user.domain.User;
-import com.dms.deverytime.domain.user.domain.UserRepository;
+import com.dms.deverytime.domain.user.entity.User;
+import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;

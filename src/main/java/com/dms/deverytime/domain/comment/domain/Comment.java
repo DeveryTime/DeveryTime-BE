@@ -1,7 +1,7 @@
 package com.dms.deverytime.domain.comment.domain;
 
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.user.domain.User;
+import com.dms.deverytime.domain.user.entity.User;
 import com.dms.deverytime.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
