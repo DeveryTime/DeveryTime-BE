@@ -24,8 +24,6 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
-//조회가 더 많으므로 기본값을 readOnly를 사용해 더티채킹을 막기
-@Transactional(readOnly = true)
 @Service
 @RequiredArgsConstructor
 public class PostService {
@@ -54,6 +52,7 @@ public class PostService {
         return postRepository.save(post).getId();
     }
 
+    @Transactional (readOnly = true)
     public Page<PostListResponse> getPostList(Pageable pageable) {
 
         // 페이징 조건으로 게시글 목록 조회
