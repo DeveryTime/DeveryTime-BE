@@ -31,9 +31,16 @@ public class PostController {
 
     // 게시글 목록 조회
     @GetMapping
-    public ApiResponse<Page<PostListResponse>> getPostList(Pageable pageable) {
-        return ApiResponse.success(postService.getPostList(pageable));
+    public ApiResponse<Page<PostListResponse>> getPostList(
+            @RequestParam(required = false) Long categoryId, Pageable pageable) {
+        return ApiResponse.success(postService.getPostList(categoryId, pageable));
     }
+
+    //public ApiResponse<Page<PostListResponse>> getPostList(
+    //        @RequestParam(required = false) Long categoryId,
+    //        Pageable pageable) {
+    //    return ApiResponse.success(postService.getPostList(categoryId, pageable));
+    //}
 
     // 게시글 상세 조회
     @GetMapping("/{id}")
