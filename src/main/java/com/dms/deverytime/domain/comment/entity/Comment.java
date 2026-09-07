@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.comment.domain;
+package com.dms.deverytime.domain.comment.entity;
 
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.user.entity.User;

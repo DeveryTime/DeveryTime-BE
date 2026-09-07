@@ -1,13 +1,13 @@
-package com.dms.deverytime.domain.comment.application;
+package com.dms.deverytime.domain.comment.service;
 
 
-import com.dms.deverytime.domain.comment.domain.Comment;
-import com.dms.deverytime.domain.comment.domain.CommentRepository;
-import com.dms.deverytime.domain.comment.presentation.dto.request.CommentCreateRequest;
-import com.dms.deverytime.domain.comment.presentation.dto.request.CommentUpdateRequest;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentCreateResponse;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentListResponse;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentUpdateResponse;
+import com.dms.deverytime.domain.comment.entity.Comment;
+import com.dms.deverytime.domain.comment.repository.CommentRepository;
+import com.dms.deverytime.domain.comment.dto.request.CommentCreateRequest;
+import com.dms.deverytime.domain.comment.dto.request.CommentUpdateRequest;
+import com.dms.deverytime.domain.comment.dto.response.CommentCreateResponse;
+import com.dms.deverytime.domain.comment.dto.response.CommentListResponse;
+import com.dms.deverytime.domain.comment.dto.response.CommentUpdateResponse;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.user.entity.User;

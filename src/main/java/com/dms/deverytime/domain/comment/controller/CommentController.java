@@ -1,11 +1,11 @@
-package com.dms.deverytime.domain.comment.presentation.controller;
+package com.dms.deverytime.domain.comment.controller;
 
-import com.dms.deverytime.domain.comment.application.CommentService;
-import com.dms.deverytime.domain.comment.presentation.dto.request.CommentCreateRequest;
-import com.dms.deverytime.domain.comment.presentation.dto.request.CommentUpdateRequest;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentCreateResponse;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentListResponse;
-import com.dms.deverytime.domain.comment.presentation.dto.response.CommentUpdateResponse;
+import com.dms.deverytime.domain.comment.service.CommentService;
+import com.dms.deverytime.domain.comment.dto.request.CommentCreateRequest;
+import com.dms.deverytime.domain.comment.dto.request.CommentUpdateRequest;
+import com.dms.deverytime.domain.comment.dto.response.CommentCreateResponse;
+import com.dms.deverytime.domain.comment.dto.response.CommentListResponse;
+import com.dms.deverytime.domain.comment.dto.response.CommentUpdateResponse;
 import com.dms.deverytime.global.response.ApiResponse;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
 import jakarta.validation.Valid;

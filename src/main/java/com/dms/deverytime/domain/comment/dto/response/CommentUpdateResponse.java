@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.comment.presentation.dto.response;
+package com.dms.deverytime.domain.comment.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

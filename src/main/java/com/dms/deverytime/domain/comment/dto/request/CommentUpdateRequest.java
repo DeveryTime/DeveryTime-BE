@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.comment.presentation.dto.request;
+package com.dms.deverytime.domain.comment.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
