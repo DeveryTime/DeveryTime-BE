@@ -39,9 +39,9 @@ public class Post {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    //상태 필수, "DRAFT" or "PUBLISHED" 때문에 10글자 이내
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
-    private String status;
+    private PostCreateStatus status;
 
     //int라 null X
     @Column(nullable = false)
