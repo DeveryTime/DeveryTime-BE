@@ -19,10 +19,35 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
+
+app:
+  mail:
+    from: ${MAIL_USERNAME}
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 1800000
   refresh-token-expiration: 1209600000
+
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
 
 server:
   port: 8080
