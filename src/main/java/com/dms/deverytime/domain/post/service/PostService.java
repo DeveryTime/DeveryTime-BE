@@ -122,7 +122,8 @@ public class PostService {
 
         // 제목 내용 수정
         post.update(request.getTitle(), request.getContent());
-    } // @PreUpdate가 수정일시 자동 반영, 더티체킹으로 별도 코드 X
+        postRepository.save(post);
+    } // @PreUpdate가 수정일시 자동 반영, 더티체킹으로 별도 코드 "postRepository.save(post);" 없어도 기능적으론 =.
 
     @Transactional
     public void deletePost(Long postId, Long loginUserId) {
