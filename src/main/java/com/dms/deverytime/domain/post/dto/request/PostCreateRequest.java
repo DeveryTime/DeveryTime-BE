@@ -1,14 +1,15 @@
 package com.dms.deverytime.domain.post.dto.request;
 
-import jakarta.validation.constraints.Max;
+import com.dms.deverytime.domain.post.entity.PostCreateStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
-public class PostRequest {
+public class PostCreateRequest {
 
     @NotBlank
     private Long categoryId;
@@ -25,6 +26,6 @@ public class PostRequest {
     private String status;
 
     // 기본 생성자
-    public PostRequest() {
+    public PostCreateRequest() {
     }
 }

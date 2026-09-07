@@ -2,7 +2,7 @@ package com.dms.deverytime.domain.post.service;
 
 import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.category.repository.CategoryRepository;
-import com.dms.deverytime.domain.post.dto.request.PostRequest;
+import com.dms.deverytime.domain.post.dto.request.PostCreateRequest;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
@@ -37,7 +37,7 @@ public class PostService {
     private final PostViewLogRepository postViewLogRepository;
 
     @Transactional
-    public Long createPost(PostRequest request, Long loginUserId) {
+    public Long createPost(PostCreateRequest request, Long loginUserId) {
         //User 존재 유무 체크
         User user = userRepository.findById(loginUserId)
                 // 찾는 그 User가 없으면 User 없다는 에러코드

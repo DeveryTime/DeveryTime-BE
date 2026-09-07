@@ -1,10 +1,9 @@
 package com.dms.deverytime.domain.post.controller;
 
-import com.dms.deverytime.domain.post.dto.request.PostRequest;
+import com.dms.deverytime.domain.post.dto.request.PostCreateRequest;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
-import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.post.service.PostService;
 import com.dms.deverytime.global.response.ApiResponse;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
@@ -24,7 +23,7 @@ public class PostController {
 
     // 게시글 생성
     @PostMapping
-    public ApiResponse<Long> createPost(@Valid @RequestBody PostRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ApiResponse<Long> createPost(@Valid @RequestBody PostCreateRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
         Long postId = postService.createPost(request, loginUserId);
         return ApiResponse.success(postId);
