@@ -8,6 +8,7 @@ import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.post.service.PostService;
 import com.dms.deverytime.global.response.ApiResponse;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,7 +24,7 @@ public class PostController {
 
     // 게시글 생성
     @PostMapping
-    public ApiResponse<Long> createPost(@RequestBody PostRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ApiResponse<Long> createPost(@Valid @RequestBody PostRequest request, @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
         Long postId = postService.createPost(request, loginUserId);
         return ApiResponse.success(postId);
@@ -46,7 +47,7 @@ public class PostController {
     // 게시글 수정
     @PutMapping("/{id}")
     public ApiResponse<Void> updatePost(@PathVariable Long id,
-                                        @RequestBody PostUpdateRequest request,
+                                        @Valid @RequestBody PostUpdateRequest request,
                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
         postService.updatePost(id, request, loginUserId);
