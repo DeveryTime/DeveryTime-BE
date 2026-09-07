@@ -66,7 +66,7 @@ public class Post {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public Post(User user, Category category, String title, String content, String status) {
+    public Post(User user, Category category, String title, String content, PostCreateStatus status) {
         this.user = user;
         this.category = category;
         this.title = title;

@@ -22,9 +22,8 @@ public class PostCreateRequest {
     @Size(max = 7777)
     private String content;
 
-    @NotBlank
-    @Size (max = 10)
-    private String status;
+    @NotNull
+    private PostCreateStatus status;
 
     // 기본 생성자
     public PostCreateRequest() {

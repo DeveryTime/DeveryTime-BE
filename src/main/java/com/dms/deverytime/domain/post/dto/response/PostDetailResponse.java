@@ -1,5 +1,6 @@
 package com.dms.deverytime.domain.post.dto.response;
 
+import com.dms.deverytime.domain.post.entity.PostCreateStatus;
 import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,7 +12,7 @@ public class PostDetailResponse {
     private Long id;
     private String title;
     private String content;
-    private String status;
+    private PostCreateStatus status;
     private int viewCount;
     private String writerNickname;
     private String writerProfileImageUrl;
@@ -20,7 +21,7 @@ public class PostDetailResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public PostDetailResponse(Long id, String title, String content, String status, int viewCount,
+    public PostDetailResponse(Long id, String title, String content, PostCreateStatus status, int viewCount,
                               String writerNickname, String writerProfileImageUrl, String categoryName, List<String> imageUrls,
                               LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
