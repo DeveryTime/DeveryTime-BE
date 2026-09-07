@@ -19,6 +19,7 @@ public class PostCreateRequest {
     private String title;
 
     @NotBlank
+    @Size(max = 7777)
     private String content;
 
     @NotBlank
