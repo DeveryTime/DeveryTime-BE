@@ -109,16 +109,20 @@ public class PostService {
         );
     }
 
+    // update, delete id 비교 검증 전용 메서드
+    private void validatePostOwner(Post post, Long loginUserId) {
+        if (!post.getUser().getId().equals(loginUserId)) {
+            throw new DeveryTimeException(ErrorCode.FORBIDDEN);
+        }
+    }
+
     @Transactional
     public void updatePost(Long postId, PostUpdateRequest request, Long loginUserId) {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
-        // 본인 확인--- JWT로 뽑은 로그인 유저 id와 게시글 작성자 id 비교
-        if (!post.getUser().getId().equals(loginUserId)) {
-            throw new DeveryTimeException(ErrorCode.FORBIDDEN);
-        }
+       validatePostOwner(post, loginUserId);
 
         // 제목 내용 수정
         post.update(request.getTitle(), request.getContent());
@@ -131,9 +135,7 @@ public class PostService {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
-        if (!post.getUser().getId().equals(loginUserId)) {
-            throw new DeveryTimeException(ErrorCode.FORBIDDEN);
-        }
+        validatePostOwner(post, loginUserId);
 
         // 자식 데이터 먼저 삭제
         postViewLogRepository.deleteByPostId(postId);
