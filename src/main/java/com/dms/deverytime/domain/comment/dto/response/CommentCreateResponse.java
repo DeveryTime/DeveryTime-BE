@@ -12,5 +12,4 @@ public class CommentCreateResponse {
     private Long userId;
     private String content;
     private LocalDateTime createdAt;
-
 }
