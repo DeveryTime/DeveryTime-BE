@@ -16,9 +16,15 @@ public class SearchController {
 
     private final SearchService searchService;
 
-    // 게시글 제목 검색
+    // 게시글 제목에 포함된 키워드 검색
     @PostMapping("/posts")
     public ApiResponse<PageResponse<PostListResponse>> searchPosts(@Valid @RequestBody PostSearchRequest request) {
         return ApiResponse.success(searchService.searchPostsByTitle(request));
+    }
+
+    // 유저 검색
+    @PostMapping("/users")
+    public ApiResponse<PageResponse<PostListResponse>> searchPostsByUsername(@Valid @RequestBody PostSearchRequest request) {
+        return ApiResponse.success(searchService.searchPostsByUsername(request));
     }
 }
