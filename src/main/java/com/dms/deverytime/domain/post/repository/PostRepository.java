@@ -25,4 +25,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.category.id = :categoryId")
     Page<Post> findByCategoryIdWithCategory(@Param("categoryId") Long categoryId, Pageable pageable);
+
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.title LIKE %:keyword%")
+    Page<Post> findByTitleContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 }
