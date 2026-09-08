@@ -19,6 +19,7 @@ public class SearchController {
     // 게시글 제목에 포함된 키워드 검색
     @PostMapping("/posts")
     public ApiResponse<PageResponse<PostListResponse>> searchPosts(@Valid @RequestBody PostSearchRequest request) {
+        // 서비스 호출 --> 결과를 ApiResponse으로 감싸서 반환
         return ApiResponse.success(searchService.searchPostsByTitle(request));
     }
 

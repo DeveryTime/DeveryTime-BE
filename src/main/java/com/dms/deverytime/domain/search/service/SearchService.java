@@ -13,11 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true) // 다 readonly 이므로 위에서 수식
 public class SearchService {
 
     private final PostRepository postRepository;
 
-    @Transactional(readOnly = true)
     public PageResponse<PostListResponse> searchPostsByTitle(PostSearchRequest request) {
         Pageable pageable = request.toPageable();
 
@@ -30,10 +30,10 @@ public class SearchService {
                 post.getCreatedAt()
         ));
 
+        // Spring 기본 Page 요소들을 우리가 원하는 5개 필드만 있는 PageResponse로 재포장
         return new PageResponse<>(mapped);
     }
 
-    @Transactional(readOnly = true)
     public PageResponse<PostListResponse> searchPostsByUsername(PostSearchRequest request) {
         Pageable pageable = request.toPageable();
 
