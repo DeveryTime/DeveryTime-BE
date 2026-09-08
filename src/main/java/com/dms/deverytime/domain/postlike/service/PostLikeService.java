@@ -49,5 +49,18 @@ public class PostLikeService {
 
     }
 
+    @Transactional
+    public PostLikeResponse cancelLike(Long postId, Long userId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.USER_NOT_FOUND));
+
+        // 없으면 NOT_LIKED
+        // 조회한 PostLike 삭제
+        // liked=false 응답 반환
+    }
+
 
 }
