@@ -32,4 +32,20 @@ public class SearchService {
 
         return new PageResponse<>(mapped);
     }
+
+    @Transactional(readOnly = true)
+    public PageResponse<PostListResponse> searchPostsByUsername(PostSearchRequest request) {
+        Pageable pageable = request.toPageable();
+
+        Page<Post> posts = postRepository.findByUserUsernameContainingWithCategory(request.getKeyword(), pageable);
+
+        Page<PostListResponse> mapped = posts.map(post -> new PostListResponse(
+                post.getId(),
+                post.getTitle(),
+                post.getCategory().getName(),
+                post.getCreatedAt()
+        ));
+
+        return new PageResponse<>(mapped);
+    }
 }
