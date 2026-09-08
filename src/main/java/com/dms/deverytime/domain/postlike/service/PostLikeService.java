@@ -37,7 +37,7 @@ public class PostLikeService {
             throw new DeveryTimeException(ErrorCode.ALREADY_LIKED);
         }
 
-        PostLike postLike = new PostLike(post,user);
+        PostLike postLike = new PostLike(post, user);
         postLikeRepository.save(postLike);
 
         return new PostLikeResponse(
@@ -57,9 +57,16 @@ public class PostLikeService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.USER_NOT_FOUND));
 
-        // 없으면 NOT_LIKED
-        // 조회한 PostLike 삭제
-        // liked=false 응답 반환
+        PostLike postLike = postLikeRepository.findByPostIdAndUserId(postId, userId)
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.NOT_LIKED));
+
+        postLikeRepository.delete(postLike);
+
+        return new PostLikeResponse(
+                post.getId(),
+                user.getId(),
+                false
+        );
     }
 
 
