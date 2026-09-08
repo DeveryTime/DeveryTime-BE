@@ -21,7 +21,7 @@ public class EmailVerificationVerifyService {
     public void verifyEmailCode(VerifyEmailRequest request){
 
         EmailVerification verification =
-                emailVerificationRepository.findByEmail(request.email())
+                emailVerificationRepository.findByEmailWithLock(request.email())
                         .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
         validateVerification(verification);

@@ -33,7 +33,7 @@ public class EmailVerificationSendService {
         LocalDateTime expiresAt = now.plusMinutes(5);
 
         EmailVerification verification =
-                emailVerificationRepository.findByEmail(request.email())
+                emailVerificationRepository.findByEmailWithLock(request.email())
                         .orElseGet(() -> EmailVerification.builder()
                                 .email(request.email())
                                 .code(code)

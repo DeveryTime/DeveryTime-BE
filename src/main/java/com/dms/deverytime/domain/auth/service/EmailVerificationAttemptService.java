@@ -18,7 +18,7 @@ public class EmailVerificationAttemptService {
 
     public int increaseAttemptCount(Long verificationId){
         EmailVerification verification =
-                verificationRepository.findById(verificationId)
+                verificationRepository.findByIdWithLock(verificationId)
                         .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
         verification.increaseVerificationAttemptCount();
