@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.service;
+package com.dms.deverytime.domain.auth.service.email;
 
 import com.dms.deverytime.domain.auth.entity.EmailVerification;
 import com.dms.deverytime.domain.auth.dto.request.VerifyEmailRequest;
