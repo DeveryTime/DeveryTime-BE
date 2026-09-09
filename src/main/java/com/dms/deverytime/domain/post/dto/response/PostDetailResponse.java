@@ -20,10 +20,12 @@ public class PostDetailResponse {
     private List<String> imageUrls;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long likeCount;
+    private boolean liked;
 
     public PostDetailResponse(Long id, String title, String content, PostCreateStatus status, int viewCount,
                               String writerNickname, String writerProfileImageUrl, String categoryName, List<String> imageUrls,
-                              LocalDateTime createdAt, LocalDateTime updatedAt) {
+                              LocalDateTime createdAt, LocalDateTime updatedAt, long likeCount, boolean liked) {
         this.id = id;
         this.title = title;
         this.content = content;
@@ -35,5 +37,7 @@ public class PostDetailResponse {
         this.imageUrls = imageUrls;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.likeCount = likeCount;
+        this.liked = liked;
     }
 }
