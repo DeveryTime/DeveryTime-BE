@@ -12,4 +12,5 @@
 
         long countByPostId(Long postId);
 
+        void deleteByPostId (Long postId);
     }

@@ -149,6 +149,7 @@ public class PostService {
         // 자식 데이터 먼저 삭제
         postViewLogRepository.deleteByPostId(postId);
         postImageRepository.deleteByPostId(postId);
+        postLikeRepository.deleteByPostId(postId);
 
         postRepository.delete(post);
     }
