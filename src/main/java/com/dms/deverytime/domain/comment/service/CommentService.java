@@ -73,13 +73,7 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(()->new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
 
-        if (!comment.getPost().getId().equals(postId)) {
-            throw new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND);
-        }
-
-        if (!comment.getUser().getId().equals(userId)) {
-            throw new DeveryTimeException(ErrorCode.COMMENT_ACCESS_DENIED);
-        }
+        validateCommentAccess(comment, postId, userId);
 
         comment.updateContent(request.content());
 
@@ -99,6 +93,12 @@ public class CommentService {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(()->new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
 
+        validateCommentAccess(comment, postId, userId);
+
+        commentRepository.delete(comment);
+    }
+
+    private void validateCommentAccess(Comment comment, Long postId, Long userId) {
         if (!comment.getPost().getId().equals(postId)) {
             throw new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND);
         }
@@ -106,9 +106,6 @@ public class CommentService {
         if (!comment.getUser().getId().equals(userId)) {
             throw new DeveryTimeException(ErrorCode.COMMENT_ACCESS_DENIED);
         }
-
-        commentRepository.delete(comment);
     }
-
 
 }
