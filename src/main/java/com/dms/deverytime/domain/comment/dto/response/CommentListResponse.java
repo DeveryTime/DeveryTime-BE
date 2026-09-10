@@ -1,16 +1,13 @@
 package com.dms.deverytime.domain.comment.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import java.time.LocalDateTime;
 
-@Getter
-@AllArgsConstructor
-public class CommentListResponse {
-    private Long id;
-    private Long userId;
-    private String authorName;
-    private String profileImageUrl;
-    private String content;
-    private LocalDateTime createdAt;
+public record CommentListResponse(
+        Long id,
+        Long userId,
+        String authorName,
+        String profileImageUrl,
+        String content,
+        LocalDateTime createdAt
+) {
 }
