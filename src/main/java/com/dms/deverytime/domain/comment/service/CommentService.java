@@ -47,7 +47,7 @@ public class CommentService {
         );
     }
 
-    public List<CommentListResponse> getList(Long postId){
+    public List<CommentListResponse> getCommentList(Long postId){
         Post post = postRepository.findById(postId)
                 .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 

@@ -36,10 +36,10 @@ public class CommentController {
     }
 
     @GetMapping
-    public ApiResponse<List<CommentListResponse>> getComment(
+    public ApiResponse<List<CommentListResponse>> getCommentList(
             @PathVariable Long postId
     ){
-        List<CommentListResponse> responses = commentService.getList(postId);
+        List<CommentListResponse> responses = commentService.getCommentList(postId);
 
         return ApiResponse.success(responses);
     }
