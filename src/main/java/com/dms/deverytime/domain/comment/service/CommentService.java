@@ -29,49 +29,42 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
 
-    public CommentCreateResponse createComment (Long postId, Long userId, CommentCreateRequest request){
+    public CommentCreateResponse createComment(Long postId, Long userId, CommentCreateRequest request) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.USER_NOT_FOUND));
 
-        Comment comment= Comment.builder()
+        Comment comment = Comment.builder()
                 .post(post)
                 .user(user)
                 .content(request.content())
-                        .build();
+                .build();
 
         Comment savedComment = commentRepository.save(comment);
-        return new CommentCreateResponse(savedComment.getId(),post.getId(), user.getId(), savedComment.getContent(),savedComment.getCreatedAt()
+        return new CommentCreateResponse(savedComment.getId(), post.getId(), user.getId(), savedComment.getContent(), savedComment.getCreatedAt()
         );
     }
 
-    public List<CommentListResponse> getCommentList(Long postId){
+    public List<CommentListResponse> getCommentList(Long postId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
-        List<Comment> comments =commentRepository.findAllByPostIdWithUser(postId);
+        List<Comment> comments = commentRepository.findAllByPostIdWithUser(postId);
 
         return comments.stream()
-            .map(comment-> new CommentListResponse(
-                    comment.getId(),
-                    comment.getUser().getId(),
-                    comment.getUser().getName(),
-                    comment.getUser().getProfileImageUrl(),
-                    comment.getContent(),
-                    comment.getCreatedAt()
-
-            ))
-                    .toList();
+                .map(comment -> CommentListResponse.from(comment))
+                .toList();
 
     }
-    public CommentUpdateResponse updateComment(Long postId,Long commentId,Long userId,CommentUpdateRequest request){
+
+    public CommentUpdateResponse updateComment(Long postId, Long commentId, Long userId, CommentUpdateRequest request) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
 
         validateCommentAccess(comment, postId, userId);
 
@@ -86,12 +79,12 @@ public class CommentService {
         );
     }
 
-    public void deleteComment(Long postId,Long commentId,Long userId){
+    public void deleteComment(Long postId, Long commentId, Long userId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
 
         validateCommentAccess(comment, postId, userId);
 
