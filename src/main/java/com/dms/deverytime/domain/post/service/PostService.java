@@ -53,12 +53,13 @@ public class PostService {
     }
 
     @Transactional (readOnly = true)
-    public Page<PostListResponse> getPostList(Pageable pageable) {
+    public Page<PostListResponse> getPostList(Long categoryId, Pageable pageable) {
 
-        // 페이징 조건으로 게시글 목록 조회
-        Page<Post> posts = postRepository.findAllWithCategory(pageable);
+        // categoryId가 있으면 해당 카테고리 조회
+        Page<Post> posts = (categoryId != null)
+                ? postRepository.findByCategoryIdWithCategory(categoryId, pageable)
+                : postRepository.findAllWithCategory(pageable);
 
-        //DTO로 변환
         return posts.map(post -> new PostListResponse(
                 post.getId(),
                 post.getTitle(),
