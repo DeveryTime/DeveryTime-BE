@@ -1,7 +1,7 @@
 package com.dms.deverytime.domain.auth.controller;
 
-import com.dms.deverytime.domain.auth.service.EmailVerificationSendService;
-import com.dms.deverytime.domain.auth.service.EmailVerificationVerifyService;
+import com.dms.deverytime.domain.auth.service.email.EmailVerificationSendService;
+import com.dms.deverytime.domain.auth.service.email.EmailVerificationVerifyService;
 import com.dms.deverytime.domain.auth.dto.request.SendEmailVerificationRequest;
 import com.dms.deverytime.domain.auth.dto.request.VerifyEmailRequest;
 import com.dms.deverytime.global.response.ApiResponse;
