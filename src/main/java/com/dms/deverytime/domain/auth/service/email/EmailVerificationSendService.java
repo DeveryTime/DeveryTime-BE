@@ -54,7 +54,11 @@ public class EmailVerificationSendService {
 
         } else {
             try {
-                verification = verificationCreateService.create(verification);
+                verificationCreateService.create(verification);
+
+                verification = emailVerificationRepository.findByEmailWithLock(request.email())
+                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
+
             } catch (DataIntegrityViolationException e) {
                 verification = emailVerificationRepository.findByEmailWithLock(request.email())
                         .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
