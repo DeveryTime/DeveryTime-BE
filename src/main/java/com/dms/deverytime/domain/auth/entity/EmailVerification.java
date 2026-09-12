@@ -64,10 +64,6 @@ public class EmailVerification {
         this.requestCount++;
     }
 
-    public void increaseVerificationAttemptCount(){
-        this.verificationAttemptCount++;
-    }
-
     public void resetRequestWindow(LocalDateTime now){
         this.requestCount = 1;
         this.requestWindowStartedAt = now;
