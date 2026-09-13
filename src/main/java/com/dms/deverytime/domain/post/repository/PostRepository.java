@@ -25,4 +25,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.category.id = :categoryId")
     Page<Post> findByCategoryIdWithCategory(@Param("categoryId") Long categoryId, Pageable pageable);
+
+    // 특정 사용자가 작성한 게시글 조회
+    Page<Post> findAllByUser_Id(Long userId, Pageable pageable);
 }
