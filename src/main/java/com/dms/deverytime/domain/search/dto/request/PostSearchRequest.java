@@ -1,5 +1,7 @@
 package com.dms.deverytime.domain.search.dto.request;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +17,11 @@ public class PostSearchRequest {
     @NotBlank
     private String keyword;
 
+    @Min(0)
     private int page = 0;
+
+    @Min(1)
+    @Max(50)
     private int size = 10;
     private String sort;
 
