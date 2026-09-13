@@ -27,7 +27,7 @@ public class PostSearchRequest {
 
     public Pageable toPageable() {
         if (sort == null || sort.isBlank()) {
-            return PageRequest.of(page, size);
+            return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
         }
         String[] parts = sort.split(","); // 콤마 기준으로 쪼갬
         Sort.Direction direction = (parts.length > 1 && parts[1].equalsIgnoreCase("desc"))
