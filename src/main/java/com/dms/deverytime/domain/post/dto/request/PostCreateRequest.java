@@ -11,7 +11,7 @@ import lombok.Setter;
 @Setter
 public class PostCreateRequest {
 
-    @NotBlank
+    @NotNull
     private Long categoryId;
 
     @NotBlank
