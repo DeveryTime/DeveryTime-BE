@@ -21,7 +21,8 @@ public class SearchService {
     public PageResponse<PostListResponse> searchPostsByTitle(PostSearchRequest request) {
         Pageable pageable = request.toPageable();
 
-        Page<Post> posts = postRepository.findByTitleContainingWithCategory(request.getKeyword(), pageable);
+        String keyword = request.getKeyword().trim(); //trim은 앞뒤 공백을 제거해줌
+        Page<Post> posts = postRepository.findByTitleContainingWithCategory(keyword, pageable);
 
         Page<PostListResponse> mapped = posts.map(post -> new PostListResponse(
                 post.getId(),
@@ -37,7 +38,8 @@ public class SearchService {
     public PageResponse<PostListResponse> searchPostsByUsername(PostSearchRequest request) {
         Pageable pageable = request.toPageable();
 
-        Page<Post> posts = postRepository.findByUserUsernameContainingWithCategory(request.getKeyword(), pageable);
+        String keyword = request.getKeyword().trim();
+        Page<Post> posts = postRepository.findByUserUsernameContainingWithCategory(keyword, pageable);
 
         Page<PostListResponse> mapped = posts.map(post -> new PostListResponse(
                 post.getId(),
