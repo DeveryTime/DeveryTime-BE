@@ -18,7 +18,7 @@ public class PostLikeController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<PostLikeResponse> createLike (@PathVariable Long postId, @AuthenticationPrincipal CustomUserDetails userDetails) {
+    public ApiResponse<PostLikeResponse> createLike(@PathVariable("postId") Long postId, @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
         PostLikeResponse response = postLikeService.createLike(postId, loginUserId);
         return ApiResponse.success(response,"좋아요가 등록되었습니다.");
@@ -26,7 +26,7 @@ public class PostLikeController {
     }
 
     @DeleteMapping
-    public ApiResponse<PostLikeResponse> cancelLike (@PathVariable Long postId, @AuthenticationPrincipal CustomUserDetails userDetails){
+    public ApiResponse<PostLikeResponse> cancelLike (@PathVariable("postId") Long postId, @AuthenticationPrincipal CustomUserDetails userDetails){
         PostLikeResponse response =postLikeService.cancelLike(postId,userDetails.getUserId());
         return ApiResponse.success(response,"좋아요가 취소되었습니다.");
     }
