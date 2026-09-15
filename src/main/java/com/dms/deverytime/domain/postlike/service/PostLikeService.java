@@ -11,6 +11,7 @@ import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +24,9 @@ public class PostLikeService {
 
 
     @Transactional
-    public PostLikeResponse createLike(Long postId, Long userId){
+    public PostLikeResponse createLike(Long postId, Long userId) {
         Post post = postRepository.findById(postId)
-                .orElseThrow(()->new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.USER_NOT_FOUND));
@@ -38,13 +39,17 @@ public class PostLikeService {
         }
 
         PostLike postLike = new PostLike(post, user);
-        postLikeRepository.save(postLike);
+
+        try {
+            postLikeRepository.saveAndFlush(postLike);
+        } catch (DataIntegrityViolationException e) {
+            throw new DeveryTimeException(ErrorCode.ALREADY_LIKED);
+        }
 
         return new PostLikeResponse(
-          post.getId(),
-          user.getId(),
+                post.getId(),
+                user.getId(),
                 true
-
         );
     }
 
