@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.service;
+package com.dms.deverytime.domain.auth.service.email;
 
 import com.dms.deverytime.domain.auth.dto.request.SendEmailVerificationRequest;
 import com.dms.deverytime.domain.auth.entity.EmailVerification;
@@ -9,6 +9,7 @@ import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ public class EmailVerificationSendService {
     private final EmailVerificationRepository emailVerificationRepository;
     private final UserRepository userRepository;
     private final EmailSender emailSender;
+    private final EmailVerificationCreateService verificationCreateService;
 
     public void sendEmailVerification(SendEmailVerificationRequest request){
 
@@ -33,7 +35,7 @@ public class EmailVerificationSendService {
         LocalDateTime expiresAt = now.plusMinutes(5);
 
         EmailVerification verification =
-                emailVerificationRepository.findByEmail(request.email())
+                emailVerificationRepository.findByEmailWithLock(request.email())
                         .orElseGet(() -> EmailVerification.builder()
                                 .email(request.email())
                                 .code(code)
@@ -50,9 +52,25 @@ public class EmailVerificationSendService {
             validateRequestLimit(verification, now);
             verification.update(code, expiresAt, now);
 
+        } else {
+            try {
+                verificationCreateService.create(verification);
+
+                verification = emailVerificationRepository.findByEmailWithLock(request.email())
+                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
+
+            } catch (DataIntegrityViolationException e) {
+                verification = emailVerificationRepository.findByEmailWithLock(request.email())
+                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
+
+                if (verification.isVerified())
+                    throw new DeveryTimeException(ErrorCode.EMAIL_ALREADY_VERIFIED);
+
+                validateRequestLimit(verification, now);
+                verification.update(code, expiresAt, now);
+            }
         }
 
-        emailVerificationRepository.save(verification);
         emailSender.sendVerificationCode(verification.getEmail(), verification.getCode());
     }
 

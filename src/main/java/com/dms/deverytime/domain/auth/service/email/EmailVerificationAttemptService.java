@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.auth.service;
+package com.dms.deverytime.domain.auth.service.email;
 
 import com.dms.deverytime.domain.auth.entity.EmailVerification;
 import com.dms.deverytime.domain.auth.repository.EmailVerificationRepository;
@@ -15,13 +15,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class EmailVerificationAttemptService {
 
     private final EmailVerificationRepository verificationRepository;
+    private static final int MAX_ATTEMPTS = 5;
 
     public int increaseAttemptCount(Long verificationId){
-        EmailVerification verification =
-                verificationRepository.findById(verificationId)
-                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
-        verification.increaseVerificationAttemptCount();
-        return verification.getVerificationAttemptCount();
+        int updatedRows = verificationRepository
+                .increaseAttemptCount(verificationId, MAX_ATTEMPTS);
+
+        if (updatedRows == 0)
+            throw new DeveryTimeException(ErrorCode.VERIFICATION_ATTEMPT_EXCEEDED);
+
+        return updatedRows;
     }
 }
