@@ -12,6 +12,7 @@ import com.dms.deverytime.domain.post.entity.PostViewLog;
 import com.dms.deverytime.domain.post.repository.PostImageRepository;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.post.repository.PostViewLogRepository;
+import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
 import com.dms.deverytime.domain.user.entity.User;
 import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
@@ -33,6 +34,7 @@ public class PostService {
     private final CategoryRepository categoryRepository;
     private final PostImageRepository postImageRepository;
     private final PostViewLogRepository postViewLogRepository;
+    private final PostLikeRepository postLikeRepository;
 
     @Transactional
     public Long createPost(PostCreateRequest request, Long loginUserId) {
@@ -53,12 +55,13 @@ public class PostService {
     }
 
     @Transactional (readOnly = true)
-    public Page<PostListResponse> getPostList(Pageable pageable) {
+    public Page<PostListResponse> getPostList(Long categoryId, Pageable pageable) {
 
-        // 페이징 조건으로 게시글 목록 조회
-        Page<Post> posts = postRepository.findAllWithCategory(pageable);
+        // categoryId가 있으면 해당 카테고리 조회
+        Page<Post> posts = (categoryId != null)
+                ? postRepository.findByCategoryIdWithCategory(categoryId, pageable)
+                : postRepository.findAllWithCategory(pageable);
 
-        //DTO로 변환
         return posts.map(post -> new PostListResponse(
                 post.getId(),
                 post.getTitle(),
@@ -93,6 +96,11 @@ public class PostService {
                 .map(PostImage::getImageUrl)
                 .toList();
 
+        long likeCount = postLikeRepository.countByPostId(id);
+
+        boolean liked =
+                postLikeRepository.existsByPostIdAndUserId(id, loginUserId);
+
         // DTO로 변환
         return new PostDetailResponse(
                 post.getId(),
@@ -105,7 +113,9 @@ public class PostService {
                 post.getCategory().getName(),
                 imageUrls,
                 post.getCreatedAt(),
-                post.getUpdatedAt()
+                post.getUpdatedAt(),
+                likeCount,
+                liked
         );
     }
 
@@ -140,6 +150,7 @@ public class PostService {
         // 자식 데이터 먼저 삭제
         postViewLogRepository.deleteByPostId(postId);
         postImageRepository.deleteByPostId(postId);
+        postLikeRepository.deleteByPostId(postId);
 
         postRepository.delete(post);
     }

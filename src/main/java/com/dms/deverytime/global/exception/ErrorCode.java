@@ -22,17 +22,21 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", "이메일 또는 비밀번호가 일치하지 않습니다."),
 
     FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "해당 작업을 수행할 권한이 없습니다."),
+    COMMENT_ACCESS_DENIED(HttpStatus.FORBIDDEN,"COMMENT_ACCESS_DENIED","댓글을 수정하거나 삭제할 권한이 없습니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 사용자입니다."),
-    EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "EMAIL_VERIFICATION_NOT_FOUND", "인증 코드를 먼저 발송해주세요."),
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "존재하지 않는 게시글입니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "존재하지 않는 댓글입니다."),
+    EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "EMAIL_VERIFICATION_NOT_FOUND", "인증 코드를 먼저 발송해주세요."),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_NOT_FOUND", "존재하지 않는 카테고리입니다."),
+    NOT_LIKED(HttpStatus.NOT_FOUND, "NOT_LIKED","좋아요를 누르지 않은 게시글입니다."),
 
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용중인 이메일입니다."),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "이미 사용중인 아이디입니다."),
     SCHOOL_NUMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "SCHOOL_NUMBER_ALREADY_EXISTS", "이미 사용중인 학번입니다."),
     EMAIL_ALREADY_VERIFIED(HttpStatus.CONFLICT, "EMAIL_ALREADY_VERIFIED", "이미 인증된 이메일 입니다."),
     USERNAME_CHANGE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "USERNAME_CHANGE_LIMIT_EXCEEDED", "아이디는 24시간에 한 번만 변경할 수 있습니다."),
+    ALREADY_LIKED(HttpStatus.CONFLICT,"ALREADY_LIKED","이미 좋아요를 누른 게시글입니다."),
 
     VERIFICATION_CODE_EXPIRED(HttpStatus.GONE, "VERIFICATION_CODE_EXPIRED", "인증 코드가 만료되었습니다. 다시 요청해주세요."),
 

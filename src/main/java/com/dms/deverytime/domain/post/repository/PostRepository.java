@@ -3,8 +3,10 @@ package com.dms.deverytime.domain.post.repository;
 import com.dms.deverytime.domain.post.entity.Post;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
@@ -21,6 +23,18 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT p FROM Post p JOIN FETCH p.category")
     Page<Post> findAllWithCategory(Pageable pageable);
 
+
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.category.id = :categoryId")
+    Page<Post> findByCategoryIdWithCategory(@Param("categoryId") Long categoryId, Pageable pageable);
+
+    // 특정 사용자가 작성한 게시글 조회
+    @EntityGraph(attributePaths = "category")
     Page<Post> findAllByUser_Id(Long userId, Pageable pageable);
 
+    // LIKE %:keyword%로 keyword가 title 안에 포함돼 있으면 매치
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.title LIKE %:keyword%")
+    Page<Post> findByTitleContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.user.username LIKE %:keyword%")
+    Page<Post> findByUserUsernameContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 }
