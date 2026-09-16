@@ -19,9 +19,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 사용자 검색 - username
     Page<Post> findByUserUsernameContaining(String userKeyword, Pageable pageable);
 
-    //사용자가 자신이 작성한 게시글을 페이징하여 조회
-    Page<Post> findAllByUser_Id(Long userId, Pageable pageable);
-
     //게시글이랑 카테고리를 한번에 가져옴 (N+1 문제 해결)
     @Query("SELECT p FROM Post p JOIN FETCH p.category")
     Page<Post> findAllWithCategory(Pageable pageable);
