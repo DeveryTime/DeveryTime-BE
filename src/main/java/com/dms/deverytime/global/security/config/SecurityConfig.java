@@ -48,7 +48,8 @@ public class SecurityConfig {
                                 "/api/auth/email-verifications",
                                 "/api/auth/email-verifications/verify",
                                 "/api/auth/check-username",
-                                "/api/auth/reissue"
+                                "/api/auth/reissue",
+                                "/health"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
