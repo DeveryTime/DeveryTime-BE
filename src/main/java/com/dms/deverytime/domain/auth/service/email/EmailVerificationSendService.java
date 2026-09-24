@@ -34,30 +34,34 @@ public class EmailVerificationSendService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime expiresAt = now.plusMinutes(5);
 
-        EmailVerification verification =
-                emailVerificationRepository.findByEmailWithLock(request.email())
-                        .orElseGet(() -> EmailVerification.builder()
-                                .email(request.email())
-                                .code(code)
-                                .expiresAt(expiresAt)
-                                .sentAt(now)
-                                .requestWindowStartedAt(now)
-                                .build());
+        boolean verificationExists =
+                emailVerificationRepository.existsByEmail(request.email());
 
-        if (verification.getId() != null){
+        EmailVerification verification;
+
+        if (verificationExists){
+            verification = emailVerificationRepository
+                    .findByEmailWithLock(request.email())
+                    .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
             if (verification.isVerified())
                 throw new DeveryTimeException(ErrorCode.EMAIL_ALREADY_VERIFIED);
 
             validateRequestLimit(verification, now);
             verification.update(code, expiresAt, now);
+        }
 
-        } else {
+        else {
+            verification = EmailVerification.builder()
+                    .email(request.email())
+                    .code(code)
+                    .expiresAt(expiresAt)
+                    .sentAt(now)
+                    .requestWindowStartedAt(now)
+                    .build();
+
             try {
                 verificationCreateService.create(verification);
-
-                verification = emailVerificationRepository.findByEmailWithLock(request.email())
-                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
             } catch (DataIntegrityViolationException e) {
                 verification = emailVerificationRepository.findByEmailWithLock(request.email())
@@ -92,6 +96,5 @@ public class EmailVerificationSendService {
 
             verification.increaseRequestCount();
         }
-
     }
 }
