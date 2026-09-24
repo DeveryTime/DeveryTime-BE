@@ -13,7 +13,6 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Service
 @Transactional
@@ -35,12 +34,12 @@ public class EmailVerificationSendService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime expiresAt = now.plusMinutes(5);
 
-        Optional<EmailVerification> existingVerification =
-                emailVerificationRepository.findByEmail(request.email());
+        boolean verificationExists =
+                emailVerificationRepository.existsByEmail(request.email());
 
         EmailVerification verification;
 
-        if (existingVerification.isPresent()){
+        if (verificationExists){
             verification = emailVerificationRepository
                     .findByEmailWithLock(request.email())
                     .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
@@ -63,9 +62,6 @@ public class EmailVerificationSendService {
 
             try {
                 verificationCreateService.create(verification);
-
-                verification = emailVerificationRepository.findByEmailWithLock(request.email())
-                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.EMAIL_VERIFICATION_NOT_FOUND));
 
             } catch (DataIntegrityViolationException e) {
                 verification = emailVerificationRepository.findByEmailWithLock(request.email())
