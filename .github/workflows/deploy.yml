@@ -5,6 +5,10 @@ on:
     branches:
       - develop
 
+concurrency:
+  group: deverytime-develop-deploy
+  cancel-in-progress: true
+
 permissions:
   id-token: write
   contents: read
@@ -38,17 +42,29 @@ jobs:
 
       - name: Upload JAR to S3
         run: |
+          set -e
+
           JAR_FILE=$(find build/libs -maxdepth 1 -type f -name "*.jar" ! -name "*-plain.jar" | head -n 1)
-          aws s3 cp "$JAR_FILE" s3://deverytime-deploy-091914202048/deverytime.jar
+
+          if [ -z "$JAR_FILE" ]; then
+            echo "JAR 파일을 찾을 수 없습니다."
+            exit 1
+          fi
+
+          aws s3 cp "$JAR_FILE" \
+            "s3://deverytime-deploy-091914202048/${{ github.sha }}.jar"
 
       - name: Deploy to EC2
         run: |
+          set -e
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "i-05ddb126c6dbacca1" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=[
+              "set -e",
               "mkdir -p /opt/deverytime",
-              "aws s3 cp s3://deverytime-deploy-091914202048/deverytime.jar /opt/deverytime/deverytime.jar",
+              "aws s3 cp s3://deverytime-deploy-091914202048/${{ github.sha }}.jar /opt/deverytime/deverytime.jar",
               "systemctl restart deverytime"
             ]' \
             --query "Command.CommandId" \
