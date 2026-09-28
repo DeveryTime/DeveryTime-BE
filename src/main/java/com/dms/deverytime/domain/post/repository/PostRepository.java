@@ -16,8 +16,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 게시글 제목 검색
     Page<Post> findByTitleContaining(String keyword, Pageable pageable);
 
-    // 사용자 검색 - username
-    Page<Post> findByUserUsernameContaining(String userKeyword, Pageable pageable);
 
     //게시글이랑 카테고리를 한번에 가져옴 (N+1 문제 해결)
     @Query("SELECT p FROM Post p JOIN FETCH p.category")
@@ -35,6 +33,4 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.title LIKE %:keyword%")
     Page<Post> findByTitleContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 
-    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.user.username LIKE %:keyword%")
-    Page<Post> findByUserUsernameContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 }
