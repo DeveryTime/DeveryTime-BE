@@ -25,14 +25,19 @@ public class PostImage {
     @Column(nullable = false, length = 500)
     private String imageUrl;
 
+    // 이미지의 고유 id
+    @Column(nullable = false)
+    private String publicId;
+
     // 이미지 순서
     @Column(nullable = false)
     private int sortOrder;
 
-    public PostImage(Post post, String imageUrl, int sortOrder) {
+    public PostImage(Post post, String imageUrl, int sortOrder, String publicId) {
         this.post = post;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
+        this.publicId = publicId;
     }
 
 }
