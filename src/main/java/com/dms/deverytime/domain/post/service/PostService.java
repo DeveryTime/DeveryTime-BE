@@ -5,6 +5,7 @@ import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.post.dto.request.PostCreateRequest;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
+import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.entity.PostImage;
@@ -15,6 +16,8 @@ import com.dms.deverytime.domain.post.repository.PostViewLogRepository;
 import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
 import com.dms.deverytime.domain.user.entity.User;
 import com.dms.deverytime.domain.user.repository.UserRepository;
+import com.dms.deverytime.global.cloudinary.dto.ImageUploadResult;
+import com.dms.deverytime.global.cloudinary.service.ImageStorageService;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import org.springframework.data.domain.Page;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -35,6 +39,7 @@ public class PostService {
     private final PostImageRepository postImageRepository;
     private final PostViewLogRepository postViewLogRepository;
     private final PostLikeRepository postLikeRepository;
+    private final ImageStorageService imageStorageService;
 
     @Transactional
     public Long createPost(PostCreateRequest request, Long loginUserId) {
@@ -153,6 +158,34 @@ public class PostService {
         postLikeRepository.deleteByPostId(postId);
 
         postRepository.delete(post);
+    }
+
+    // 게시글 이미지 업로드
+    @Transactional
+    public PostImageResponse uploadPostImage(Long postId, MultipartFile file,
+                                             Integer sortOrder, Long loginUserId) {
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        // 본인 게시글에만 업로드
+        validatePostOwner(post, loginUserId);
+
+        // Cloudinary 업로드
+        ImageUploadResult result = imageStorageService.upload(file, "posts");
+
+        // ImageUploadResult는 프로필 업로드 결과지만 이름 안바꾸고 게시글에서도 재사용함
+        // profileImageUrl = 이미지 URL, profileImagePublicId = Cloudinary publicId
+        String imageUrl = result.profileImageUrl();
+        String publicId = result.profileImagePublicId();
+
+        // sortOrder는 값 안보내면 0
+        int order = (sortOrder != null) ? sortOrder : 0;
+
+        PostImage postImage = postImageRepository.save(
+                new PostImage(post, imageUrl, publicId, order)
+        );
+
+        return PostImageResponse.from(postImage);
     }
 
 }

@@ -33,7 +33,7 @@ public class PostImage {
     @Column(nullable = false)
     private int sortOrder;
 
-    public PostImage(Post post, String imageUrl, int sortOrder, String publicId) {
+    public PostImage(Post post, String imageUrl,String publicId, int sortOrder) {
         this.post = post;
         this.imageUrl = imageUrl;
         this.sortOrder = sortOrder;
