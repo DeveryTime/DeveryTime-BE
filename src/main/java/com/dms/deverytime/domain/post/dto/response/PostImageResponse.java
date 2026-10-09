@@ -8,12 +8,12 @@ public class PostImageResponse {
 
     private final Long id;
     private final String imageUrl;
-    private final int sortOder;
+    private final int sortOrder;
 
-    public PostImageResponse(Long id, String imageUrl, int sortOder) {
+    public PostImageResponse(Long id, String imageUrl, int sortOrder) {
         this.id = id;
         this.imageUrl = imageUrl;
-        this.sortOder = sortOder;
+        this.sortOrder = sortOrder;
     }
 
     // 저장된 PostImage 엔티티를 응답 DTO로 변환
