@@ -23,7 +23,8 @@ public class UserPostQueryService {
                 post.getId(),
                 post.getTitle(),
                 post.getCategory().getName(),
-                post.getCreatedAt()
+                post.getCreatedAt(),
+                post.getLikeCount()
         ));
     }
 }
