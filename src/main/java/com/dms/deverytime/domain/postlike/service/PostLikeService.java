@@ -46,6 +46,8 @@ public class PostLikeService {
             throw new DeveryTimeException(ErrorCode.ALREADY_LIKED);
         }
 
+        post.increaseLikeCount();
+
         return new PostLikeResponse(
                 post.getId(),
                 user.getId(),
@@ -65,6 +67,9 @@ public class PostLikeService {
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.NOT_LIKED));
 
         postLikeRepository.delete(postLike);
+
+
+        post.decreaseLikeCount();
 
         return new PostLikeResponse(
                 post.getId(),
