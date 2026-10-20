@@ -3,6 +3,7 @@ package com.dms.deverytime.domain.post.entity;
 import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.user.entity.User;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -54,6 +55,10 @@ public class Post {
     //수정시각은 @Column X -> null 허용
     private LocalDateTime updatedAt;
 
+    //좋아요 수, 정렬용으로 post_like COUNT 대신 미리 저장
+    @Column (nullable = false)
+    private int likeCount = 0;
+
     // @PrePersist = 객체가 DB에 저장되기 전에 JPA로 인해 자동으로 호출되는 메서드, 생성시간을 게시글 저장하기 직전 지금 시간으로 지정하겠다.
     @PrePersist
     protected void onCreate() {
@@ -83,6 +88,16 @@ public class Post {
 
     //조회수 1씩 증가
     public void increaseViewCount() {
-        this.viewCount += 1;
+        this.viewCount++;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        if(likeCount > 0) {
+            this.likeCount --;
+        }
     }
 }
