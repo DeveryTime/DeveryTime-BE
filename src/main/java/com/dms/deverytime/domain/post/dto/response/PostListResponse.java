@@ -11,11 +11,13 @@ public class PostListResponse {
     private String title;
     private String categoryName;
     private LocalDateTime createdAt;
+    private int likeCount;
 
-    public PostListResponse(Long id, String title, String categoryName, LocalDateTime createdAt) {
+    public PostListResponse(Long id, String title, String categoryName, LocalDateTime createdAt, int likeCount) {
         this.id = id;
         this.title = title;
         this.categoryName = categoryName;
         this.createdAt = createdAt;
+        this.likeCount = likeCount;
     }
 }

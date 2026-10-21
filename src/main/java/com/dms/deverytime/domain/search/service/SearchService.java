@@ -42,7 +42,8 @@ public class SearchService {
                 post.getId(),
                 post.getTitle(),
                 post.getCategory().getName(),
-                post.getCreatedAt()
+                post.getCreatedAt(),
+                post.getLikeCount()
         ));
 
         PageResponse<PostListResponse> postPage = new PageResponse<>(mappedPosts);

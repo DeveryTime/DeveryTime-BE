@@ -71,7 +71,8 @@ public class PostService {
                 post.getId(),
                 post.getTitle(),
                 post.getCategory().getName(), // ← 주의: category는 LAZY라서 여기서 실제 쿼리가 나감 (N+1 위험 지점)
-                post.getCreatedAt()
+                post.getCreatedAt(),
+                post.getLikeCount()
         ));
     }
 
