@@ -70,6 +70,7 @@ public class PostService {
         return posts.map(post -> new PostListResponse(
                 post.getId(),
                 post.getTitle(),
+                post.getUser().getId(),
                 post.getCategory().getName(), // ← 주의: category는 LAZY라서 여기서 실제 쿼리가 나감 (N+1 위험 지점)
                 post.getCreatedAt(),
                 post.getLikeCount()
@@ -114,6 +115,7 @@ public class PostService {
                 post.getContent(),
                 post.getStatus(),
                 post.getViewCount(),
+                post.getUser().getId(),
                 post.getUser().getName(),
                 post.getUser().getProfileImageUrl(),
                 post.getCategory().getName(),
