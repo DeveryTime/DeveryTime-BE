@@ -14,6 +14,7 @@ public class PostDetailResponse {
     private String content;
     private PostCreateStatus status;
     private int viewCount;
+    private Long writerId;
     private String writerNickname;
     private String writerProfileImageUrl;
     private String categoryName;
@@ -23,7 +24,7 @@ public class PostDetailResponse {
     private long likeCount;
     private boolean liked;
 
-    public PostDetailResponse(Long id, String title, String content, PostCreateStatus status, int viewCount,
+    public PostDetailResponse(Long id, String title, String content, PostCreateStatus status, int viewCount, Long writerId,
                               String writerNickname, String writerProfileImageUrl, String categoryName, List<String> imageUrls,
                               LocalDateTime createdAt, LocalDateTime updatedAt, long likeCount, boolean liked) {
         this.id = id;
@@ -31,6 +32,7 @@ public class PostDetailResponse {
         this.content = content;
         this.status = status;
         this.viewCount = viewCount;
+        this.writerId = writerId;
         this.writerNickname = writerNickname;
         this.writerProfileImageUrl = writerProfileImageUrl;
         this.categoryName = categoryName;
