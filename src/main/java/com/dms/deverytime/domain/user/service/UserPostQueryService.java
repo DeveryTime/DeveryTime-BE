@@ -22,6 +22,7 @@ public class UserPostQueryService {
         return posts.map(post -> new PostListResponse(
                 post.getId(),
                 post.getTitle(),
+                post.getUser().getId(),
                 post.getCategory().getName(),
                 post.getCreatedAt(),
                 post.getLikeCount()
