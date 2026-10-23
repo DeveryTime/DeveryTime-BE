@@ -2,6 +2,7 @@ package com.dms.deverytime.domain.post.service;
 
 import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.category.repository.CategoryRepository;
+import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.dto.request.PostCreateRequest;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
@@ -40,6 +41,7 @@ public class PostService {
     private final PostViewLogRepository postViewLogRepository;
     private final PostLikeRepository postLikeRepository;
     private final ImageStorageService imageStorageService;
+    private final CommentRepository commentRepository;
 
     @Transactional
     public Long createPost(PostCreateRequest request, Long loginUserId) {
@@ -154,6 +156,7 @@ public class PostService {
         validatePostOwner(post, loginUserId);
 
         // 자식 데이터 먼저 삭제
+        commentRepository.deleteByPostId(postId);
         postViewLogRepository.deleteByPostId(postId);
         postImageRepository.deleteByPostId(postId);
         postLikeRepository.deleteByPostId(postId);
