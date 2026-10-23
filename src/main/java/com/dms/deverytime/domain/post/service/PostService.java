@@ -116,7 +116,7 @@ public class PostService {
                 post.getStatus(),
                 post.getViewCount(),
                 post.getUser().getId(),
-                post.getUser().getName(),
+                post.getUser().getUsername(),
                 post.getUser().getProfileImageUrl(),
                 post.getCategory().getName(),
                 imageUrls,
