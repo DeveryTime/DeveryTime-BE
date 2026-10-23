@@ -16,7 +16,7 @@ public record CommentListResponse(
         return new CommentListResponse(
                 comment.getId(),
                 comment.getUser().getId(),
-                comment.getUser().getName(),
+                comment.getUser().getUsername(),
                 comment.getUser().getProfileImageUrl(),
                 comment.getContent(),
                 comment.getCreatedAt()
