@@ -53,6 +53,10 @@ dependencies {
     // Development
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
+    // Flyway
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
