@@ -9,6 +9,7 @@ import com.dms.deverytime.domain.user.repository.UserRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import com.dms.deverytime.global.security.jwt.JwtProvider;
+import com.dms.deverytime.global.security.jwt.RefreshTokenHasher;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +24,7 @@ public class LoginService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenHasher refreshTokenHasher;
 
     public TokenResponse login(LoginRequest request){
 
@@ -35,8 +37,10 @@ public class LoginService {
         String accessToken = jwtProvider.generateAccessToken(user.getId());
         String refreshToken = jwtProvider.generateRefreshToken(user.getId());
 
+        String refreshTokenHash = refreshTokenHasher.hash(refreshToken);
+
         RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
+                .token(refreshTokenHash)
                 .userId(user.getId())
                 .expiresAt(jwtProvider.getExpiration(refreshToken))
                 .build();
