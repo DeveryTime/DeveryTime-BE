@@ -7,6 +7,7 @@ import com.dms.deverytime.domain.auth.repository.RefreshTokenRepository;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import com.dms.deverytime.global.security.jwt.JwtProvider;
+import com.dms.deverytime.global.security.jwt.RefreshTokenHasher;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,12 +19,15 @@ public class ReissueService {
 
     private final JwtProvider jwtProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenHasher refreshTokenHasher;
 
     public TokenResponse reissue(ReissueRequest request){
         jwtProvider.validateRefreshToken(request.refreshToken());
 
+        String savedRefreshTokenHash = refreshTokenHasher.hash(request.refreshToken());
+
         RefreshToken savedRefreshToken = refreshTokenRepository
-                .findByToken(request.refreshToken())
+                .findByToken(savedRefreshTokenHash)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.TOKEN_INVALID));
 
         Long userId = savedRefreshToken.getUserId();
@@ -33,8 +37,10 @@ public class ReissueService {
         String accessToken = jwtProvider.generateAccessToken(userId);
         String refreshToken = jwtProvider.generateRefreshToken(userId);
 
+        String refreshTokenHash = refreshTokenHasher.hash(refreshToken);
+
         RefreshToken newRefreshToken = RefreshToken.builder()
-                .token(refreshToken)
+                .token(refreshTokenHash)
                 .userId(userId)
                 .expiresAt(jwtProvider.getExpiration(refreshToken))
                 .build();
