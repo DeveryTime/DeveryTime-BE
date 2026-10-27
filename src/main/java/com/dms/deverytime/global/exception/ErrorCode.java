@@ -47,6 +47,7 @@ public enum ErrorCode {
     VERIFICATION_ATTEMPT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "VERIFICATION_ATTEMPT_EXCEEDED", "인증 시도 횟수를 초과했습니다. 인증 코드를 다시 요청해주세요."),
 
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 측 오류가 발생했습니다."),
+    TOKEN_HASHING_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "TOKEN_HASHING_FAILED", "토큰 해시 처리에 실패했습니다."),
 
     SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE", "현재 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요."),
     IMAGE_DELETE_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "IMAGE_DELETE_FAILED", "이미지 삭제에 실패했습니다."),
