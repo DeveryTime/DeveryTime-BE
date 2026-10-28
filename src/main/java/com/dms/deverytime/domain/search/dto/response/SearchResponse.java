@@ -9,9 +9,9 @@ import java.util.List;
 public class SearchResponse {
 
     private final List<UserInfo> users;
-    private final PageResponse<PostListResponse> posts;
+    private final PageResponse<PostSearchInfo> posts;
 
-    public SearchResponse(List<UserInfo> users, PageResponse<PostListResponse> posts) {
+    public SearchResponse(List<UserInfo> users, PageResponse<PostSearchInfo> posts) {
         this.users = users;
         this.posts = posts;
     }

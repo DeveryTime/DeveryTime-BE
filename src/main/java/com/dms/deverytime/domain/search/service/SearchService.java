@@ -5,6 +5,7 @@ import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.search.dto.request.PostSearchRequest;
 import com.dms.deverytime.domain.search.dto.response.PageResponse;
+import com.dms.deverytime.domain.search.dto.response.PostSearchInfo;
 import com.dms.deverytime.domain.search.dto.response.SearchResponse;
 import com.dms.deverytime.domain.search.dto.response.UserInfo;
 import com.dms.deverytime.domain.user.entity.User;
@@ -38,16 +39,9 @@ public class SearchService {
         // 제목 검색
         Page<Post> posts = postRepository.findByTitleContainingWithCategory(keyword, pageable);
 
-        Page<PostListResponse> mappedPosts = posts.map(post -> new PostListResponse(
-                post.getId(),
-                post.getTitle(),
-                post.getUser().getId(),
-                post.getCategory().getName(),
-                post.getCreatedAt(),
-                post.getLikeCount()
-        ));
+        Page<PostSearchInfo> mappedPosts = posts.map(PostSearchInfo::from);
 
-        PageResponse<PostListResponse> postPage = new PageResponse<>(mappedPosts);
+        PageResponse<PostSearchInfo> postPage = new PageResponse<>(mappedPosts);
 
         return new SearchResponse(userInfos, postPage);
     }
