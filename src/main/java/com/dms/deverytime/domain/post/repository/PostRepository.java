@@ -30,7 +30,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findAllByUser_Id(Long userId, Pageable pageable);
 
     // LIKE %:keyword%로 keyword가 title 안에 포함돼 있으면 매치
-    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.title LIKE %:keyword%")
+    // JOIN FETCH p.user: getUser().getProfileImageUrl() 호출 시 게시글마다 User 쿼리가 나가는 N+1 방지
+    @Query("SELECT p FROM Post p JOIN FETCH p.category JOIN FETCH p.user WHERE p.title LIKE %:keyword%")
     Page<Post> findByTitleContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 
 }
