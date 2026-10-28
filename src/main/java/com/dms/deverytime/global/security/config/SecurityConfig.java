@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 "/api/auth/reissue"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/posts").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/search").permitAll()
                         .anyRequest().authenticated()
                 )
 
