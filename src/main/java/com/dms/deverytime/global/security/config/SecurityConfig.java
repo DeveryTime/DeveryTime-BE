@@ -54,7 +54,8 @@ public class SecurityConfig {
                                 "/api/auth/check-username",
                                 "/api/auth/reissue"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/posts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/posts", "/swagger-ui.html",
+                                "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/search").permitAll()
                         .anyRequest().authenticated()
                 )
