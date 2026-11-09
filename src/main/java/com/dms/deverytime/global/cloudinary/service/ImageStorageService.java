@@ -18,7 +18,7 @@ public class ImageStorageService {
 
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
-    private static final long MAX_IMAGE_SIZE = 4 * 1024 * 1024;
+    private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 
     public ImageUploadResult upload(MultipartFile file, String folder){
 
