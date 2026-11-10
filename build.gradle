@@ -6,7 +6,7 @@ plugins {
 
 group = 'com.dms'
 version = '0.0.1-SNAPSHOT'
-description = 'devrytime-be'
+description = 'deverytime-be'
 
 java {
     toolchain {
@@ -32,10 +32,19 @@ dependencies {
     // DTO Validation
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
+    // Cloudinary
+    implementation 'com.cloudinary:cloudinary-http5:2.0.0'
+
+    // Apache Tika
+    implementation 'org.apache.tika:tika-core:3.2.3'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'
@@ -43,6 +52,10 @@ dependencies {
 
     // Development
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Flyway
+    implementation 'org.springframework.boot:spring-boot-starter-flyway'
+    implementation 'org.flywaydb:flyway-mysql'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
