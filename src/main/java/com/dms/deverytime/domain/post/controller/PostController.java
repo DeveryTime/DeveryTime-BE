@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 // HTTP로 받고 JSON으로 응답
 @RestController
 @RequestMapping("/api/posts")
@@ -68,16 +70,24 @@ public class PostController {
         return ApiResponse.successMessage("게시글이 삭제되었습니다.");
     }
 
-    // 게시글 이미지 업로드 — 한 번에 한 장
+    // 게시글 이미지 업로드 — 기존 이미지를 포함해 최대 3장
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<PostImageResponse> uploadPostImage(
-            @PathVariable Long id,
-            @RequestPart("file") MultipartFile file,
-            @RequestParam(required = false) Integer sortOrder,
+    public ApiResponse<List<PostImageResponse>> uploadPostImages(
+            @PathVariable("id") Long id,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
-        return ApiResponse.success(postService.uploadPostImage(id, file, sortOrder, loginUserId));
+        return ApiResponse.success(postService.uploadPostImages(id, files, loginUserId));
+    }
+
+    @PutMapping(value = "/{id}/images/{imageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<PostImageResponse> replacePostImage(
+            @PathVariable("id") Long id,
+            @PathVariable("imageId") Long imageId,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ApiResponse.success(postService.replacePostImage(id, imageId, file, userDetails.getUserId()));
     }
 
 }
