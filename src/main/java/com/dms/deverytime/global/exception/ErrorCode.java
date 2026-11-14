@@ -15,6 +15,7 @@ public enum ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "EMAIL_NOT_VERIFIED", "이메일 인증이 필요합니다."),
     INVALID_IMAGE_FILE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_FILE", "올바른 이미지 파일을 업로드해주세요."),
     INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_TYPE", "지원하지 않는 이미지 형식입니다."),
+    POST_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "POST_IMAGE_LIMIT_EXCEEDED", "게시글 이미지는 최대 3장까지 첨부할 수 있습니다."),
 
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "로그인이 필요한 서비스입니다."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "TOKEN_EXPIRED", "만료된 토큰입니다."),
@@ -26,6 +27,7 @@ public enum ErrorCode {
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 사용자입니다."),
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_NOT_FOUND", "존재하지 않는 게시글입니다."),
+    POST_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_IMAGE_NOT_FOUND", "해당 게시글의 이미지를 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "존재하지 않는 댓글입니다."),
     EMAIL_VERIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "EMAIL_VERIFICATION_NOT_FOUND", "인증 코드를 먼저 발송해주세요."),
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CATEGORY_NOT_FOUND", "존재하지 않는 카테고리입니다."),
