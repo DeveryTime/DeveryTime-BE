@@ -155,7 +155,30 @@ public class PostService {
         Post post = postRepository.findByIdForImageUpload(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
-       validatePostOwner(post, loginUserId);
+        validatePostOwner(post, loginUserId);
+
+        List<PostImage> deletedImages = new ArrayList<>();
+        if (request.getDeleteImageIds() != null) {
+            for (Long imageId : request.getDeleteImageIds().stream().distinct().toList()) {
+                PostImage image = postImageRepository.findByIdAndPostId(imageId, postId)
+                        .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_IMAGE_NOT_FOUND));
+                deletedImages.add(image);
+            }
+        }
+        // 교체 후 아직 본문에 남아 있는 이전 URL도 삭제 전에 함께 검증한다.
+        List<PostImageCleanup> pending = postImageCleanupRepository.findByPostIdOrderById(postId);
+        for (PostImage image : deletedImages) {
+            if (PostImageCleanupService.referencesImage(request.getContent(), image.getImageUrl())
+                    || pending.stream().anyMatch(cleanup -> cleanup.getImageId().equals(image.getId())
+                    && PostImageCleanupService.referencesImage(request.getContent(), cleanup.getImageUrl()))) {
+                throw new DeveryTimeException(ErrorCode.VALIDATION_ERROR);
+            }
+        }
+
+        for (PostImage image : deletedImages) {
+            postImageCleanupRepository.save(new PostImageCleanup(postId, image));
+            postImageRepository.delete(image);
+        }
 
         // 제목 내용 수정
         post.update(request.getTitle(), request.getContent());

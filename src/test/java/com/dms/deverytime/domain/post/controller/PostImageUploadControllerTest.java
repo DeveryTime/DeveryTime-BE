@@ -23,6 +23,7 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class PostImageUploadControllerTest {
@@ -48,6 +49,30 @@ class PostImageUploadControllerTest {
                         return principal;
                     }
                 }).build();
+    }
+
+    @Test
+    void updateBindsDeletionIdsAndStillAcceptsExistingRequests() throws Exception {
+        mvc.perform(put("/api/posts/10").contentType("application/json")
+                        .content("{\"title\":\"title\",\"content\":\"text\",\"deleteImageIds\":[21,22]}"))
+                .andExpect(status().isOk());
+        verify(service).updatePost(eq(10L), argThat(request ->
+                List.of(21L, 22L).equals(request.getDeleteImageIds())), eq(5L));
+        mvc.perform(put("/api/posts/10").contentType("application/json")
+                        .content("{\"title\":\"title\",\"content\":\"text\"}"))
+                .andExpect(status().isOk());
+        verify(service).updatePost(eq(10L), argThat(request -> request.getDeleteImageIds() == null), eq(5L));
+    }
+
+    @Test
+    void updateRejectsInvalidDeletionListsBeforeCallingService() throws Exception {
+        for (String ids : List.of("[null]", "[0]", "[-1]", "[1,2,3,4]")) {
+            mvc.perform(put("/api/posts/10").contentType("application/json")
+                            .content("{\"title\":\"title\",\"content\":\"text\",\"deleteImageIds\":" + ids + "}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        }
+        verifyNoInteractions(service);
     }
 
     @Test

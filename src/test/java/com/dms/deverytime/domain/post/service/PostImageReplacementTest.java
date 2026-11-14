@@ -27,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -238,6 +239,117 @@ class PostImageReplacementTest {
         service.updatePost(postId, request("{broken " + NEW_URL), userId);
         verify(storage, never()).delete("old-file");
         assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+    }
+
+    @Test
+    void deletesOneOfThreeAfterCommitAndPreservesRemainingOrder() {
+        transaction.executeWithoutResult(status -> {
+            Post post = em.getReference(Post.class, postId);
+            em.persist(new PostImage(post, "https://example.com/second", "second", 5));
+            em.persist(new PostImage(post, "https://example.com/third", "third", 6));
+        });
+        transaction.executeWithoutResult(status -> {
+            service.updatePost(postId, deletionRequest("updated content", imageId), userId);
+            verify(storage, never()).delete(anyString());
+        });
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).extracting(PostImage::getSortOrder)
+                .containsExactly(5, 6);
+        assertThat(savedContent()).isEqualTo("updated content");
+        verify(storage).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        service.uploadPostImages(postId, List.of(file()), userId);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
+    }
+
+    @Test
+    void deletesLastPhotoButKeepsPostAndAcceptsDuplicateIdsOnce() {
+        service.updatePost(postId, deletionRequest("text only", imageId, imageId), userId);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
+        assertThat(savedContent()).isEqualTo("text only");
+        verify(storage, times(1)).delete("old-file");
+    }
+
+    @Test
+    void omittedOrEmptyDeletionListPreservesPhotos() {
+        service.updatePost(postId, request("first update"), userId);
+        service.updatePost(postId, deletionRequest("second update"), userId);
+        assertThat(images.findById(imageId)).isPresent();
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void rejectsInvalidOrForeignIdWithoutPartialUpdate() {
+        Long foreignId = transaction.execute(status -> {
+            Post original = em.find(Post.class, postId);
+            Post other = new Post(original.getUser(), original.getCategory(), "other", "content",
+                    PostCreateStatus.PUBLISHED);
+            em.persist(other);
+            PostImage foreign = new PostImage(other, NEW_URL, "foreign", 0);
+            em.persist(foreign);
+            return foreign.getId();
+        });
+        assertError(() -> service.updatePost(postId, deletionRequest("changed", imageId, foreignId), userId),
+                ErrorCode.POST_IMAGE_NOT_FOUND);
+        assertError(() -> service.updatePost(postId, deletionRequest("changed", imageId, -1L), userId),
+                ErrorCode.POST_IMAGE_NOT_FOUND);
+        assertError(() -> service.updatePost(postId, deletionRequest("changed", imageId), -1L),
+                ErrorCode.FORBIDDEN);
+        assertThat(savedContent()).isEqualTo(body(OLD_URL));
+        assertThat(images.findById(imageId)).isPresent();
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void rejectsReferencedImageIncludingEscapedJsonAndPreviousReplacementUrl() {
+        assertError(() -> service.updatePost(postId, deletionRequest(body(OLD_URL), imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        String json = "{\"images\":[\"https:\\/\\/example.com\\/old.png\"]}";
+        assertError(() -> service.updatePost(postId, deletionRequest(json, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        service.replacePostImage(postId, imageId, file(), userId);
+        assertError(() -> service.updatePost(postId, deletionRequest(body(OLD_URL), imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void rollbackRestoresPhotoContentAndCleanupRecords() {
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            service.updatePost(postId, deletionRequest("text only", imageId), userId);
+            failBeforeCommit();
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(savedContent()).isEqualTo(body(OLD_URL));
+        assertThat(images.findById(imageId)).isPresent();
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void failedDeletedPhotoCleanupIsRetriedOnNextSave() {
+        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing()
+                .when(storage).delete("old-file");
+        service.updatePost(postId, deletionRequest("text only", imageId), userId);
+        assertThat(images.findById(imageId)).isEmpty();
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        service.updatePost(postId, request("next save"), userId);
+        verify(storage, times(2)).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void deletionAfterReplacementCleansBothVersions() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, deletionRequest("text only", imageId), userId);
+        verify(storage).delete("old-file");
+        verify(storage).delete("new-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    private PostUpdateRequest deletionRequest(String content, Long... ids) {
+        PostUpdateRequest request = request(content);
+        ReflectionTestUtils.setField(request, "deleteImageIds", List.of(ids));
+        return request;
     }
 
     private String savedContent() {

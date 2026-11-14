@@ -34,8 +34,8 @@ public class PostImageCleanupService {
             if (post != null) {
                 PostImage current = imageRepository.findByIdAndPostId(pending.getImageId(), postId).orElse(null);
                 // 새 URL 반영과 이전 URL 제거를 모두 확인한 경우에만 이전 파일을 삭제한다.
-                if (current == null || referencesImage(post.getContent(), pending.getImageUrl())
-                        || !referencesImage(post.getContent(), current.getImageUrl())) {
+                if (referencesImage(post.getContent(), pending.getImageUrl())
+                        || (current != null && !referencesImage(post.getContent(), current.getImageUrl()))) {
                     continue;
                 }
             }
@@ -50,7 +50,7 @@ public class PostImageCleanupService {
         }
     }
 
-    private boolean referencesImage(String content, String imageUrl) {
+    static boolean referencesImage(String content, String imageUrl) {
         if (content == null) {
             return false;
         }
@@ -66,7 +66,7 @@ public class PostImageCleanupService {
         return HtmlUtils.htmlUnescape(content).contains(imageUrl);
     }
 
-    private boolean referencesImage(JsonNode node, String imageUrl) {
+    private static boolean referencesImage(JsonNode node, String imageUrl) {
         if (node == null) {
             return false;
         }
