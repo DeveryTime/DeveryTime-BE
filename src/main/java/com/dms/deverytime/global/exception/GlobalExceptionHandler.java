@@ -5,6 +5,7 @@ import com.dms.deverytime.global.exception.response.ErrorDetail;
 import com.dms.deverytime.global.exception.response.ErrorResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mail.MailException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -15,6 +16,11 @@ import java.util.List;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableRequest(HttpMessageNotReadableException e) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorData.from(ErrorCode.VALIDATION_ERROR)));
+    }
 
     @ExceptionHandler(DeveryTimeException.class)
     public ResponseEntity<ErrorResponse> handleDeveryTimeException(DeveryTimeException e){
