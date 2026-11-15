@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Table(name = "post")
 
@@ -15,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 @NoArgsConstructor
 // 이 클래스가 DB 테이블과 매핑되는 객체임을 선언
 @Entity
+@DynamicUpdate
 //모든 필드의 getter 메서드를 롬복이 컴파일 시점에 자동으로 생성
 @Getter
 public class Post {

@@ -38,6 +38,7 @@ import static org.mockito.Mockito.*;
 class PostUpdateContractTest {
     @Autowired PostService service;
     @Autowired PostRepository posts;
+    @Autowired PostImageRepository images;
     @Autowired EntityManagerFactory factory;
     @Autowired PlatformTransactionManager manager;
     private static final AtomicInteger sequence = new AtomicInteger(3000);
@@ -62,6 +63,51 @@ class PostUpdateContractTest {
             postId = post.getId(); userId = user.getId(); originalCategoryId = first.getId();
             newCategoryId = second.getId();
         });
+    }
+
+    @Test
+    void delayedFirstViewCannotRepublishDraftOrOverwriteEditedContent() throws Exception {
+        service.updatePost(postId, request(null, PostCreateStatus.PUBLISHED), userId);
+        User viewer = tx.execute(s -> em.find(User.class, userId));
+        var users = mock(UserRepository.class);
+        var views = mock(PostViewLogRepository.class);
+        var readStarted = new java.util.concurrent.CountDownLatch(1);
+        var finishRead = new java.util.concurrent.CountDownLatch(1);
+        when(users.findById(userId)).thenReturn(java.util.Optional.of(viewer));
+        when(views.existsByPostIdAndUserId(postId, userId)).thenAnswer(invocation -> {
+            readStarted.countDown();
+            if (!finishRead.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                throw new IllegalStateException("view gate timeout");
+            }
+            return false;
+        });
+        var viewingService = new PostService(posts, users, mock(CategoryRepository.class), images, views,
+                mock(PostLikeRepository.class), mock(ImageStorageService.class), mock(CommentRepository.class));
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var viewing = executor.submit(() -> tx.executeWithoutResult(s ->
+                    viewingService.getPostDetail(postId, userId)));
+            assertThat(readStarted.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var edit = request(newCategoryId, PostCreateStatus.DRAFT);
+            ReflectionTestUtils.setField(edit, "title", "private title");
+            ReflectionTestUtils.setField(edit, "content", "private content");
+            service.updatePost(postId, edit, userId);
+            finishRead.countDown();
+            viewing.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            tx.executeWithoutResult(s -> {
+                Post saved = em.find(Post.class, postId);
+                assertThat(saved.getStatus()).isEqualTo(PostCreateStatus.DRAFT);
+                assertThat(saved.getTitle()).isEqualTo("private title");
+                assertThat(saved.getContent()).isEqualTo("private content");
+                assertThat(saved.getCategory().getId()).isEqualTo(newCategoryId);
+                assertThat(saved.getViewCount()).isEqualTo(1);
+            });
+            assertError(() -> service.getPostDetail(postId, -1L), ErrorCode.POST_NOT_FOUND);
+            verify(views).save(any(PostViewLog.class));
+        } finally {
+            finishRead.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
