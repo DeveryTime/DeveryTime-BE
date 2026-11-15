@@ -52,6 +52,16 @@ class PostImageUploadControllerTest {
     }
 
     @Test
+    void staleBodyWithRetiredImageReturnsConflict() throws Exception {
+        doThrow(new DeveryTimeException(ErrorCode.POST_IMAGE_CONTENT_CONFLICT))
+                .when(service).updatePost(eq(10L), any(), eq(5L));
+        mvc.perform(put("/api/posts/10").contentType("application/json")
+                        .content("{\"title\":\"title\",\"content\":\"old image body\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("POST_IMAGE_CONTENT_CONFLICT"));
+    }
+
+    @Test
     void updateBindsDeletionIdsAndStillAcceptsExistingRequests() throws Exception {
         mvc.perform(put("/api/posts/10").contentType("application/json")
                         .content("{\"title\":\"title\",\"content\":\"text\",\"deleteImageIds\":[21,22]}"))

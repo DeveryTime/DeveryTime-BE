@@ -16,6 +16,8 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
@@ -73,6 +75,111 @@ class PostImageReplacementTest {
             imageId = image.getId();
         });
         when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
+    }
+
+    @Test
+    void oldBodyCannotRestoreDeletedFileUrlAfterReplacement() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, request(body(NEW_URL)), userId);
+        assertError(() -> service.updatePost(postId, request(body(OLD_URL)), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+        assertThat(savedContent()).isEqualTo(body(NEW_URL));
+        assertThat(pending.findByPostIdAndRetiredTrue(postId)).hasSize(1);
+        assertThat(pending.findByPostIdAndRetiredTrue(postId).get(0).isCompleted()).isTrue();
+        verify(storage, times(1)).delete("old-file");
+    }
+
+    @Test
+    void oldBodyCannotRestoreDeletedPhotoUrlWithEscapedJson() {
+        service.updatePost(postId, deletionRequest("text only", imageId), userId);
+        String oldJson = "{\"images\":[\"https:\\/\\/example.com\\/old.png\"]}";
+        assertError(() -> service.updatePost(postId, request(oldJson), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+        assertThat(savedContent()).isEqualTo("text only");
+    }
+
+    @Test
+    void retiredUrlCannotReturnEvenIfExternalDeletionFailed() {
+        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).when(storage).delete("old-file");
+        service.updatePost(postId, deletionRequest("text only", imageId), userId);
+        assertError(() -> service.updatePost(postId, request(body(OLD_URL)), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        assertThat(savedContent()).isEqualTo("text only");
+    }
+
+    @Test
+    void databaseFailureAfterExternalDeleteStillBlocksStaleBodyAndRetriesCleanup() {
+        doAnswer(invocation -> {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void beforeCommit(boolean readOnly) {
+                    throw new IllegalStateException("cleanup commit failure");
+                }
+            });
+            return null;
+        }).doNothing().when(storage).delete("old-file");
+        service.updatePost(postId, deletionRequest("text only", imageId), userId);
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        assertError(() -> service.updatePost(postId, request(body(OLD_URL)), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+        service.updatePost(postId, request("text only"), userId);
+        verify(storage, times(2)).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[공지] 사진을 삭제했습니다.", "{알림} 사진을 삭제했습니다.", "\"안내 사진을 삭제했습니다."})
+    void plainTextJsonPrefixDoesNotRejectPhotoDeletion(String content) {
+        service.updatePost(postId, deletionRequest(content, imageId), userId);
+        assertThat(savedContent()).isEqualTo(content);
+        assertThat(images.findById(imageId)).isEmpty();
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage).delete("old-file");
+    }
+
+    @Test
+    void malformedPlainTextStillRejectsActualDeletedImageUrl() {
+        assertError(() -> service.updatePost(postId, deletionRequest("[공지] " + OLD_URL, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void concurrentOlderViewCannotOverwriteNewContentOrRestoreRemovedImage() throws Exception {
+        service.replacePostImage(postId, imageId, file(), userId);
+        var readStarted = new java.util.concurrent.CountDownLatch(1);
+        var finishRead = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var viewing = executor.submit(() -> transaction.executeWithoutResult(status -> {
+                Post stalePost = em.find(Post.class, postId);
+                assertThat(stalePost.getContent()).isEqualTo(body(OLD_URL));
+                readStarted.countDown();
+                try {
+                    if (!finishRead.await(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("view gate timeout");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+                stalePost.increaseViewCount();
+            }));
+            assertThat(readStarted.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            service.updatePost(postId, request(body(NEW_URL)), userId);
+            finishRead.countDown();
+            viewing.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(savedContent()).isEqualTo(body(NEW_URL));
+            String savedTitle = transaction.execute(status -> em.find(Post.class, postId).getTitle());
+            Integer views = transaction.execute(status -> em.find(Post.class, postId).getViewCount());
+            assertThat(savedTitle).isEqualTo("updated");
+            assertThat(views).isEqualTo(1);
+            verify(storage).delete("old-file");
+        } finally {
+            finishRead.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test

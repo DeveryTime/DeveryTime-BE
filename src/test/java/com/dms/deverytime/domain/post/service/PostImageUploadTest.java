@@ -270,9 +270,9 @@ class PostImageUploadTest {
         }
 
         @Bean
-        PostImageCleanupService cleanupService(PostRepository posts, PostImageRepository images,
+        PostImageCleanupService cleanupService(PostRepository posts,
                                                PostImageCleanupRepository pending, ImageStorageService storage) {
-            return new PostImageCleanupService(posts, images, pending, storage);
+            return new PostImageCleanupService(posts, pending, storage);
         }
 
         @Bean

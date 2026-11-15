@@ -157,6 +157,13 @@ public class PostService {
 
         validatePostOwner(post, loginUserId);
 
+        // 이미 본문에서 제거한 이전 파일 URL은 뒤늦은 편집 요청으로 되살릴 수 없다.
+        for (PostImageCleanup retired : postImageCleanupRepository.findByPostIdAndRetiredTrue(postId)) {
+            if (PostImageCleanupService.referencesImageInRequest(request.getContent(), retired.getImageUrl())) {
+                throw new DeveryTimeException(ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+            }
+        }
+
         List<PostImage> deletedImages = new ArrayList<>();
         if (request.getDeleteImageIds() != null) {
             for (Long imageId : request.getDeleteImageIds().stream().distinct().toList()) {
@@ -168,16 +175,30 @@ public class PostService {
         // 교체 후 아직 본문에 남아 있는 이전 URL도 삭제 전에 함께 검증한다.
         List<PostImageCleanup> pending = postImageCleanupRepository.findByPostIdOrderById(postId);
         for (PostImage image : deletedImages) {
-            if (PostImageCleanupService.referencesImage(request.getContent(), image.getImageUrl())
+            if (PostImageCleanupService.referencesImageInRequest(request.getContent(), image.getImageUrl())
                     || pending.stream().anyMatch(cleanup -> cleanup.getImageId().equals(image.getId())
-                    && PostImageCleanupService.referencesImage(request.getContent(), cleanup.getImageUrl()))) {
+                    && PostImageCleanupService.referencesImageInRequest(request.getContent(), cleanup.getImageUrl()))) {
                 throw new DeveryTimeException(ErrorCode.VALIDATION_ERROR);
             }
         }
 
         for (PostImage image : deletedImages) {
-            postImageCleanupRepository.save(new PostImageCleanup(postId, image));
+            PostImageCleanup cleanup = new PostImageCleanup(postId, image);
+            cleanup.retire();
+            postImageCleanupRepository.save(cleanup);
+            pending.stream().filter(old -> old.getImageId().equals(image.getId())).forEach(PostImageCleanup::retire);
             postImageRepository.delete(image);
+        }
+
+        // 정리 대상 확정은 본문 저장과 함께 커밋한다. 외부 파일 삭제는 그 뒤에 수행한다.
+        for (PostImageCleanup cleanup : pending) {
+            if (cleanup.isRetired() || PostImageCleanupService.referencesImage(request.getContent(), cleanup.getImageUrl())) {
+                continue;
+            }
+            PostImage current = postImageRepository.findByIdAndPostId(cleanup.getImageId(), postId).orElse(null);
+            if (current == null || PostImageCleanupService.referencesImage(request.getContent(), current.getImageUrl())) {
+                cleanup.retire();
+            }
         }
 
         // 제목 내용 수정

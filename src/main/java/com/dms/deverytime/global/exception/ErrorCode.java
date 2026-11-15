@@ -39,6 +39,7 @@ public enum ErrorCode {
     EMAIL_ALREADY_VERIFIED(HttpStatus.CONFLICT, "EMAIL_ALREADY_VERIFIED", "이미 인증된 이메일 입니다."),
     USERNAME_CHANGE_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "USERNAME_CHANGE_LIMIT_EXCEEDED", "아이디는 24시간에 한 번만 변경할 수 있습니다."),
     ALREADY_LIKED(HttpStatus.CONFLICT,"ALREADY_LIKED","이미 좋아요를 누른 게시글입니다."),
+    POST_IMAGE_CONTENT_CONFLICT(HttpStatus.CONFLICT, "POST_IMAGE_CONTENT_CONFLICT", "이전 이미지가 포함된 본문입니다. 게시글을 다시 조회한 후 수정해주세요."),
 
     VERIFICATION_CODE_EXPIRED(HttpStatus.GONE, "VERIFICATION_CODE_EXPIRED", "인증 코드가 만료되었습니다. 다시 요청해주세요."),
 

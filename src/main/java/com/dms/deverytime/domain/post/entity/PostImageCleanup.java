@@ -27,6 +27,21 @@ public class PostImageCleanup {
     @Column(name = "public_id", nullable = false)
     private String publicId;
 
+    // 본문에서 제거되었다는 사실은 파일 삭제 전에 원래 저장 트랜잭션에서 확정한다.
+    @Column(nullable = false)
+    private boolean retired;
+
+    @Column(nullable = false)
+    private boolean completed;
+
+    public void retire() {
+        this.retired = true;
+    }
+
+    public void complete() {
+        this.completed = true;
+    }
+
     public PostImageCleanup(Long postId, PostImage image) {
         this.postId = postId;
         this.imageId = image.getId();
