@@ -341,11 +341,46 @@ class PostImageReplacementTest {
     }
 
     @Test
-    void skipsDeletionWhenContentCannotBeParsedSafely() {
+    void plainTextStartingWithBraceStillCleansUnreferencedOldFile() {
         service.replacePostImage(postId, imageId, file(), userId);
         service.updatePost(postId, request("{broken " + NEW_URL), userId);
+        verify(storage).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"## 제목\n\n**굵게**\n\n", "[문서](https://example.com/docs)\n\n", "> 인용문\n\n"})
+    void markdownReplacementPreservesBodyAndCleansOldFile(String prefix) {
+        service.replacePostImage(postId, imageId, file(), userId);
+        String markdown = prefix + "![사진](" + NEW_URL + ")";
+        service.updatePost(postId, request(markdown), userId);
+        assertThat(savedContent()).isEqualTo(markdown);
+        verify(storage).delete("old-file");
+        verify(storage, never()).delete("new-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        assertError(() -> service.updatePost(postId, request(prefix + "![이전 사진](" + OLD_URL + ")"), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+    }
+
+    @Test
+    void markdownOldImageReferenceKeepsFileAndRejectsExplicitDeletion() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        String markdown = "[문서](https://example.com/docs)\n\n![이전](" + OLD_URL + ")\n![새 사진](" + NEW_URL + ")";
+        service.updatePost(postId, request(markdown), userId);
+        assertThat(savedContent()).isEqualTo(markdown);
         verify(storage, never()).delete("old-file");
         assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        assertError(() -> service.updatePost(postId, deletionRequest(markdown, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
+    void markdownDeletionPreservesRemainingMarkdownExactly() {
+        String markdown = "[문서](https://example.com/docs)\n\n## 제목\n\n**본문**과 *강조*, <u>밑줄</u>";
+        service.updatePost(postId, deletionRequest(markdown, imageId), userId);
+        assertThat(savedContent()).isEqualTo(markdown);
+        assertThat(images.findById(imageId)).isEmpty();
+        verify(storage).delete("old-file");
     }
 
     @Test

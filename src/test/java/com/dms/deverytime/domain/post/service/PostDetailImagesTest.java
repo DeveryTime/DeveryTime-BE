@@ -26,7 +26,8 @@ class PostDetailImagesTest {
     void detailReturnsImageIdsWhilePreservingLegacyUrlList() {
         User user = User.builder().username("tester").build();
         ReflectionTestUtils.setField(user, "id", 5L);
-        Post post = new Post(user, new Category("test"), "title", "content", PostCreateStatus.PUBLISHED);
+        String markdown = "## 제목\n\n**본문**\n\n![사진](https://example.com/a)";
+        Post post = new Post(user, new Category("test"), "title", markdown, PostCreateStatus.PUBLISHED);
         ReflectionTestUtils.setField(post, "id", 10L);
         PostImage first = new PostImage(post, "https://example.com/a", "private-a", 0);
         PostImage second = new PostImage(post, "https://example.com/b", "private-b", 1);
@@ -44,6 +45,7 @@ class PostDetailImagesTest {
                 mock(CommentRepository.class), mock(PostImageCleanupRepository.class), mock(PostImageCleanupService.class));
 
         var response = service.getPostDetail(10L, 5L);
+        assertThat(response.getContent()).isEqualTo(markdown);
         assertThat(response.getImageUrls()).containsExactly("https://example.com/a", "https://example.com/b");
         assertThat(response.getImages()).extracting(PostImageResponse::getId).containsExactly(21L, 22L);
         assertThat(response.getImages()).extracting(PostImageResponse::getSortOrder).containsExactly(0, 1);

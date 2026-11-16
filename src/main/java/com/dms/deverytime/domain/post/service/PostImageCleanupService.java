@@ -43,7 +43,7 @@ public class PostImageCleanupService {
         }
     }
 
-    // 요청 검증은 일반 텍스트를 허용한다. 정리 시점의 보수적인 판정과 구분한다.
+    // 본문은 Markdown 문자열이다. JSON으로 직렬화된 기존 본문도 호환한다.
     static boolean referencesImageInRequest(String content, String imageUrl) {
         if (content == null) {
             return false;
@@ -56,19 +56,8 @@ public class PostImageCleanupService {
     }
 
     static boolean referencesImage(String content, String imageUrl) {
-        if (content == null) {
-            return false;
-        }
-        String trimmed = content.stripLeading();
-        if (trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith("\"")) {
-            try {
-                return referencesImage(JsonMapper.shared().readTree(content), imageUrl);
-            } catch (JacksonException invalidJson) {
-                // 해석할 수 없는 본문은 파일 삭제를 보류한다.
-                return true;
-            }
-        }
-        return HtmlUtils.htmlUnescape(content).contains(imageUrl);
+        // [링크](URL), 인용문 등으로 시작하는 Markdown도 정상적인 본문이다.
+        return referencesImageInRequest(content, imageUrl);
     }
 
     private static boolean referencesImage(JsonNode node, String imageUrl) {
