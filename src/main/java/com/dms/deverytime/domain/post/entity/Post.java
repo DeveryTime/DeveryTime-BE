@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import org.hibernate.annotations.DynamicUpdate;
 
 @Table(name = "post")
@@ -70,7 +71,8 @@ public class Post {
     // @PreUpdate = 업데이트 하기 전에 JPA로 인해 자동으로 호출되는 메서드, 수정시간을 업데이트 하기 직전 지금 시간으로 지정하겠다.
     @PreUpdate
     protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+        // DB DATETIME(6)와 응답의 시간 정밀도를 맞춘다.
+        this.updatedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     public Post(User user, Category category, String title, String content, PostCreateStatus status) {
@@ -82,10 +84,13 @@ public class Post {
         this.viewCount = 0;
     }
 
-    //수정은 제목, 내용만. 카테고리 수정 여부는 나중에
-    public void update(String title, String content) {
+    public void update(String title, String content, Category category, PostCreateStatus status) {
         this.title = title;
         this.content = content;
+        this.category = category;
+        this.status = status;
+        // 같은 내용으로 다시 저장해도 수정 시각을 갱신한다.
+        this.updatedAt = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     //조회수 1씩 증가

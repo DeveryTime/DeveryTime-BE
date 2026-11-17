@@ -8,6 +8,8 @@ import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
+import com.dms.deverytime.domain.post.dto.response.PostUpdateResponse;
+import com.dms.deverytime.domain.post.entity.PostCreateStatus;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.entity.PostImage;
 import com.dms.deverytime.domain.post.entity.PostImageCleanup;
@@ -97,6 +99,11 @@ public class PostService {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
+        // 조회 이력과 이미지 등 부가 정보를 읽기 전에 임시저장 글을 보호한다.
+        if (post.getStatus() == PostCreateStatus.DRAFT && !post.getUser().getId().equals(loginUserId)) {
+            throw new DeveryTimeException(ErrorCode.POST_NOT_FOUND);
+        }
+
         // 조회 이력 확인
         boolean alreadyViewed = postViewLogRepository.existsByPostIdAndUserId(id, loginUserId);
 
@@ -150,12 +157,17 @@ public class PostService {
     }
 
     @Transactional
-    public void updatePost(Long postId, PostUpdateRequest request, Long loginUserId) {
+    public PostUpdateResponse updatePost(Long postId, PostUpdateRequest request, Long loginUserId) {
 
         Post post = postRepository.findByIdForImageUpload(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
 
         validatePostOwner(post, loginUserId);
+
+        Category category = request.getCategoryId() == null ? post.getCategory()
+                : categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new DeveryTimeException(ErrorCode.CATEGORY_NOT_FOUND));
+        PostCreateStatus status = request.getStatus() == null ? post.getStatus() : request.getStatus();
 
         // 이미 본문에서 제거한 이전 파일 URL은 뒤늦은 편집 요청으로 되살릴 수 없다.
         for (PostImageCleanup retired : postImageCleanupRepository.findByPostIdAndRetiredTrue(postId)) {
@@ -199,11 +211,12 @@ public class PostService {
             cleanup.retire();
         }
 
-        // 제목 내용 수정
-        post.update(request.getTitle(), request.getContent());
-        postRepository.save(post);
+        post.update(request.getTitle(), request.getContent(), category, status);
+        // @PreUpdate로 확정된 수정 시각을 응답에 담는다.
+        postRepository.flush();
         registerReplacedImageCleanup(postId);
-    } // @PreUpdate가 수정일시 자동 반영, 더티체킹으로 별도 코드 "postRepository.save(post);" 없어도 기능적으론 =.
+        return PostUpdateResponse.from(post);
+    }
 
     @Transactional
     public void deletePost(Long postId, Long loginUserId) {

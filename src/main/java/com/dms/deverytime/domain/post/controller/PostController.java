@@ -5,6 +5,7 @@ import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
+import com.dms.deverytime.domain.post.dto.response.PostUpdateResponse;
 import com.dms.deverytime.domain.post.service.PostService;
 import com.dms.deverytime.global.response.ApiResponse;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
@@ -53,12 +54,12 @@ public class PostController {
 
     // 게시글 수정
     @PutMapping("/{id}")
-    public ApiResponse<Void> updatePost(@PathVariable Long id,
+    public ApiResponse<PostUpdateResponse> updatePost(@PathVariable Long id,
                                         @Valid @RequestBody PostUpdateRequest request,
                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
-        postService.updatePost(id, request, loginUserId);
-        return ApiResponse.successMessage("게시글이 수정되었습니다.");
+        PostUpdateResponse response = postService.updatePost(id, request, loginUserId);
+        return ApiResponse.success(response, "게시글이 수정되었습니다.");
     }
 
     // 게시글 삭제
