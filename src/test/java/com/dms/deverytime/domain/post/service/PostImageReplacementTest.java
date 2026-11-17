@@ -270,6 +270,69 @@ class PostImageReplacementTest {
         verify(storage, never()).delete("new-file");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"text only", "[문서](https://example.com/docs)\n\n**사진 없는 본문**"})
+    void replacementWithoutImageUrlsCleansOldFileOnlyAfterContentCommit(String content) {
+        service.replacePostImage(postId, imageId, file(), userId);
+
+        transaction.executeWithoutResult(status -> {
+            service.updatePost(postId, request(content), userId);
+            verify(storage, never()).delete("old-file");
+        });
+
+        assertThat(savedContent()).isEqualTo(content);
+        assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(NEW_URL);
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        assertThat(pending.findByPostIdAndRetiredTrue(postId)).hasSize(1)
+                .allMatch(cleanup -> cleanup.isCompleted());
+        verify(storage).delete("old-file");
+        verify(storage, never()).delete("new-file");
+        assertError(() -> service.updatePost(postId, request(body(OLD_URL)), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+    }
+
+    @Test
+    void repeatedReplacementsWithoutImageUrlsCleanAllPreviousFiles() {
+        when(storage.upload(any(), eq("posts")))
+                .thenReturn(ImageUploadResult.of("https://example.com/middle", "middle-file"))
+                .thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.replacePostImage(postId, imageId, file(), userId);
+
+        service.updatePost(postId, request("text only"), userId);
+
+        assertThat(savedContent()).isEqualTo("text only");
+        assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(NEW_URL);
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage).delete("old-file");
+        verify(storage).delete("middle-file");
+        verify(storage, never()).delete("new-file");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "https://example.com/old.png",
+            "https:\\/\\/example.com\\/old.png",
+            "https:&#47;&#47;example.com&#47;old.png"
+    })
+    void oldImageUrlInJsonKeyIsPreservedAndValidated(String keyUrl) {
+        service.replacePostImage(postId, imageId, file(), userId);
+        String content = "{\"![이전](" + keyUrl + ")\":\"![새 사진](" + NEW_URL + ")\"}";
+
+        service.updatePost(postId, request(content), userId);
+
+        assertThat(savedContent()).isEqualTo(content);
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        verify(storage, never()).delete("old-file");
+        assertError(() -> service.updatePost(postId, deletionRequest(content, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+
+        service.updatePost(postId, request(body(NEW_URL)), userId);
+        verify(storage).delete("old-file");
+        assertError(() -> service.updatePost(postId, request(content), userId),
+                ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
+    }
+
     @Test
     void failedContentSaveDoesNotDeleteOldFileAndCanBeRetried() {
         service.replacePostImage(postId, imageId, file(), userId);

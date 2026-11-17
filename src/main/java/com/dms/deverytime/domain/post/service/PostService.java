@@ -195,10 +195,8 @@ public class PostService {
             if (cleanup.isRetired() || PostImageCleanupService.referencesImage(request.getContent(), cleanup.getImageUrl())) {
                 continue;
             }
-            PostImage current = postImageRepository.findByIdAndPostId(cleanup.getImageId(), postId).orElse(null);
-            if (current == null || PostImageCleanupService.referencesImage(request.getContent(), current.getImageUrl())) {
-                cleanup.retire();
-            }
+            // 새 사진이 본문에 없어도, 이전 URL이 제거되었으면 이전 파일은 정리한다.
+            cleanup.retire();
         }
 
         // 제목 내용 수정

@@ -48,10 +48,14 @@ public class PostImageCleanupService {
         if (content == null) {
             return false;
         }
+        // 유효한 JSON이어도 객체 키에 사진 URL이 포함될 수 있다.
+        if (HtmlUtils.htmlUnescape(content).replace("\\/", "/").contains(imageUrl)) {
+            return true;
+        }
         try {
             return referencesImage(JsonMapper.shared().readTree(content), imageUrl);
         } catch (JacksonException notJson) {
-            return HtmlUtils.htmlUnescape(content).replace("\\/", "/").contains(imageUrl);
+            return false;
         }
     }
 
