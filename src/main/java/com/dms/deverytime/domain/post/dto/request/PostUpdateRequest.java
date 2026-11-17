@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
-import jakarta.validation.constraints.NotNull;
-import java.util.List;
 
 @Getter
 public class PostUpdateRequest {
@@ -24,9 +22,6 @@ public class PostUpdateRequest {
     @NotBlank
     @Size(max = 10000)
     private String content;
-
-    @Size(max = 3)
-    private List<@NotNull @Positive Long> deleteImageIds;
 
     public PostUpdateRequest() {
     }

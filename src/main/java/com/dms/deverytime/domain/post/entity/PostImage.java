@@ -40,9 +40,4 @@ public class PostImage {
         this.publicId = publicId;
     }
 
-    public void replaceFile(String imageUrl, String publicId) {
-        this.imageUrl = imageUrl;
-        this.publicId = publicId;
-    }
-
 }

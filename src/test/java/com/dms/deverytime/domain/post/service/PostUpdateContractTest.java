@@ -29,7 +29,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.*;
@@ -40,8 +39,6 @@ class PostUpdateContractTest {
     @Autowired PostService service;
     @Autowired PostRepository posts;
     @Autowired PostImageRepository images;
-    @Autowired PostImageCleanupRepository pending;
-    @Autowired ImageStorageService storage;
     @Autowired EntityManagerFactory factory;
     @Autowired PlatformTransactionManager manager;
     private static final AtomicInteger sequence = new AtomicInteger(3000);
@@ -52,7 +49,6 @@ class PostUpdateContractTest {
 
     @BeforeEach
     void setup() {
-        reset(storage);
         tx = new TransactionTemplate(manager);
         em = SharedEntityManagerCreator.createSharedEntityManager(factory);
         tx.executeWithoutResult(s -> {
@@ -86,8 +82,7 @@ class PostUpdateContractTest {
             return false;
         });
         var viewingService = new PostService(posts, users, mock(CategoryRepository.class), images, views,
-                mock(PostLikeRepository.class), mock(ImageStorageService.class), mock(CommentRepository.class),
-                mock(PostImageCleanupRepository.class), mock(PostImageCleanupService.class));
+                mock(PostLikeRepository.class), mock(ImageStorageService.class), mock(CommentRepository.class));
         var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
         try {
             var viewing = executor.submit(() -> tx.executeWithoutResult(s ->
@@ -129,58 +124,6 @@ class PostUpdateContractTest {
             assertThat(response.status()).isEqualTo(saved.getStatus());
             assertThat(response.updatedAt()).isNotNull().isEqualTo(saved.getUpdatedAt());
         });
-    }
-
-    @Test
-    void publishesDraftChangesCategoryAndDeletesPhotoInOneSave() {
-        Long imageId = addPhoto();
-        var request = deletionRequest(newCategoryId, PostCreateStatus.PUBLISHED, imageId);
-        String markdown = "## 제목\n\n**사진을 제거한 본문**";
-        ReflectionTestUtils.setField(request, "content", markdown);
-
-        var response = service.updatePost(postId, request, userId);
-
-        tx.executeWithoutResult(s -> {
-            Post saved = em.find(Post.class, postId);
-            assertThat(saved.getCategory().getId()).isEqualTo(newCategoryId);
-            assertThat(saved.getStatus()).isEqualTo(PostCreateStatus.PUBLISHED);
-            assertThat(saved.getContent()).isEqualTo(markdown);
-            assertThat(response.id()).isEqualTo(postId);
-            assertThat(response.status()).isEqualTo(saved.getStatus());
-            assertThat(response.updatedAt()).isNotNull().isEqualTo(saved.getUpdatedAt());
-        });
-        assertThat(images.findById(imageId)).isEmpty();
-        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("combined-photo");
-    }
-
-    @Test
-    void invalidCategoryCannotPartiallyDeletePhotoOrPublishDraft() {
-        Long imageId = addPhoto();
-
-        assertError(() -> service.updatePost(postId,
-                deletionRequest(-999L, PostCreateStatus.PUBLISHED, imageId), userId),
-                ErrorCode.CATEGORY_NOT_FOUND);
-
-        assertOriginal();
-        assertThat(images.findById(imageId)).isPresent();
-        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage, never()).delete(anyString());
-    }
-
-    @Test
-    void rollbackRestoresPhotoCategoryAndDraftWithoutDeletingFile() {
-        Long imageId = addPhoto();
-
-        tx.executeWithoutResult(s -> {
-            service.updatePost(postId, deletionRequest(newCategoryId, PostCreateStatus.PUBLISHED, imageId), userId);
-            s.setRollbackOnly();
-        });
-
-        assertOriginal();
-        assertThat(images.findById(imageId)).isPresent();
-        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage, never()).delete(anyString());
     }
 
     @Test
@@ -244,21 +187,6 @@ class PostUpdateContractTest {
         return request;
     }
 
-    private PostUpdateRequest deletionRequest(Long categoryId, PostCreateStatus status, Long imageId) {
-        var request = request(categoryId, status);
-        ReflectionTestUtils.setField(request, "deleteImageIds", List.of(imageId));
-        return request;
-    }
-
-    private Long addPhoto() {
-        return tx.execute(s -> {
-            PostImage image = new PostImage(em.getReference(Post.class, postId),
-                    "https://example.com/combined.png", "combined-photo", 0);
-            em.persist(image);
-            return image.getId();
-        });
-    }
-
     private void assertOriginal() {
         tx.executeWithoutResult(s -> {
             Post saved = em.find(Post.class, postId);
@@ -294,19 +222,11 @@ class PostUpdateContractTest {
         @Bean PlatformTransactionManager transactionManager(EntityManagerFactory factory) {
             return new JpaTransactionManager(factory);
         }
-        @Bean ImageStorageService imageStorageService() {
-            return mock(ImageStorageService.class);
-        }
-        @Bean PostImageCleanupService cleanupService(PostRepository posts, PostImageCleanupRepository pending,
-                                                     ImageStorageService storage) {
-            return new PostImageCleanupService(posts, pending, storage);
-        }
         @Bean PostService postService(PostRepository posts, CategoryRepository categories,
-                                      PostImageRepository images, PostImageCleanupRepository pending,
-                                      ImageStorageService storage, PostImageCleanupService cleanup) {
+                                      PostImageRepository images) {
             return new PostService(posts, mock(UserRepository.class), categories, images,
                     mock(PostViewLogRepository.class), mock(PostLikeRepository.class),
-                    storage, mock(CommentRepository.class), pending, cleanup);
+                    mock(ImageStorageService.class), mock(CommentRepository.class));
         }
     }
 }

@@ -15,7 +15,6 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import java.time.LocalDateTime;
-import java.util.List;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -48,7 +47,7 @@ class PostUpdateControllerTest {
         when(service.updatePost(eq(10L), any(), eq(5L))).thenReturn(new PostUpdateResponse(
                 10L, "title", PostCreateStatus.PUBLISHED, LocalDateTime.of(2026, 11, 15, 12, 0)));
         mvc.perform(put("/api/posts/10").contentType("application/json")
-                        .content("{\"categoryId\":3,\"title\":\"title\",\"content\":\"text\",\"status\":\"PUBLISHED\",\"deleteImageIds\":[21,22]}"))
+                        .content("{\"categoryId\":3,\"title\":\"title\",\"content\":\"text\",\"status\":\"PUBLISHED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(10))
@@ -57,8 +56,7 @@ class PostUpdateControllerTest {
                 .andExpect(jsonPath("$.data.updatedAt").value("2026-11-15T12:00:00"))
                 .andExpect(jsonPath("$.message").value("게시글이 수정되었습니다."));
         verify(service).updatePost(eq(10L), argThat(request -> request.getCategoryId().equals(3L)
-                && request.getStatus() == PostCreateStatus.PUBLISHED
-                && List.of(21L, 22L).equals(request.getDeleteImageIds())), eq(5L));
+                && request.getStatus() == PostCreateStatus.PUBLISHED), eq(5L));
     }
 
     @Test
