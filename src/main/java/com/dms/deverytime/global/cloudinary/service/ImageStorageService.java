@@ -39,7 +39,11 @@ public class ImageStorageService {
 
     public void delete(String publicId){
         try {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
+            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
+            // 이미 삭제된 파일도 성공으로 처리해 안전하게 재시도할 수 있게 한다.
+            if (!("ok".equals(result.get("result")) || "not found".equals(result.get("result")))) {
+                throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
+            }
         } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         }
