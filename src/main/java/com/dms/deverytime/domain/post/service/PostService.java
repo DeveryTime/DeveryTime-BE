@@ -269,10 +269,13 @@ public class PostService {
         for (MultipartFile file : files) {
             ImageUploadResult result = imageStorageService.upload(file, "posts");
             uploadedPublicIds.add(result.profileImagePublicId());
-            cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId()));
+            Long cleanupId = postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId());
+            cleanupIds.add(cleanupId);
             uploadedPublicIds.remove(result.profileImagePublicId());
             PostImage image = postImageRepository.save(new PostImage(
                     post, result.profileImageUrl(), result.profileImagePublicId(), nextOrder++));
+            // 별도 트랜잭션에서 만든 기록을 현재 트랜잭션에서 읽고 함께 확정한다.
+            postImageCleanupRepository.findByIdForUpdate(cleanupId).orElseThrow().complete();
             responses.add(PostImageResponse.from(image));
         }
 
@@ -293,11 +296,13 @@ public class PostService {
         registerUploadRollbackCleanup(postId, uploadedPublicIds, cleanupIds);
         ImageUploadResult result = imageStorageService.upload(file, "posts");
         uploadedPublicIds.add(result.profileImagePublicId());
-        cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId()));
+        Long cleanupId = postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId());
+        cleanupIds.add(cleanupId);
         uploadedPublicIds.remove(result.profileImagePublicId());
 
         postImageCleanupRepository.save(new PostImageCleanup(postId, image));
         image.replaceFile(result.profileImageUrl(), result.profileImagePublicId());
+        postImageCleanupRepository.findByIdForUpdate(cleanupId).orElseThrow().complete();
         return PostImageResponse.from(image);
     }
 
@@ -339,14 +344,6 @@ public class PostService {
                             log.error("Failed to clean up unrecorded post image: {}", publicId, cleanupFailure);
                         }
                     }
-                }
-                if (status != STATUS_COMMITTED) {
-                    return;
-                }
-                try {
-                    postImageCleanupService.cleanupAfterContentSaved(postId);
-                } catch (RuntimeException cleanupFailure) {
-                    log.error("Post image cleanup retained for retry: {}", postId, cleanupFailure);
                 }
             }
         });

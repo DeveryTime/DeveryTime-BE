@@ -79,6 +79,25 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void committedUploadCandidateCannotDeleteImageStillReferencedAfterReplacement() {
+        when(storage.upload(any(), eq("posts")))
+                .thenReturn(ImageUploadResult.of(NEW_URL, "preserved-image-a"))
+                .thenReturn(ImageUploadResult.of("https://example.com/next.png", "replacement-image-b"));
+
+        transaction.executeWithoutResult(status -> {
+            service.replacePostImage(postId, imageId, file(), userId);
+            assertThat(pending.findAll()).filteredOn(record -> record.getPublicId().equals("preserved-image-a"))
+                    .singleElement().satisfies(record -> assertThat(record.isCompleted()).isTrue());
+        });
+        service.updatePost(postId, request(body(NEW_URL)), userId);
+        service.replacePostImage(postId, imageId, file(), userId);
+        cleanupService.cleanupAfterContentSaved(postId);
+
+        assertThat(savedContent()).isEqualTo(body(NEW_URL));
+        verify(storage, never()).delete("preserved-image-a");
+    }
+
+    @Test
     void oldBodyCannotRestoreDeletedFileUrlAfterReplacement() {
         service.replacePostImage(postId, imageId, file(), userId);
         service.updatePost(postId, request(body(NEW_URL)), userId);
