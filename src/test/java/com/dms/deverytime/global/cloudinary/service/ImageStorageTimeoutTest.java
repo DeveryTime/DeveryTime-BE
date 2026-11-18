@@ -22,7 +22,13 @@ class ImageStorageTimeoutTest {
             try {
                 exchange.getRequestBody().readAllBytes();
                 Thread.sleep(2500);
-                exchange.sendResponseHeaders(200, 0);
+                String response = exchange.getRequestURI().getPath().endsWith("/upload")
+                        ? "{\"public_id\":\"posts/test\",\"secure_url\":\"https://example.com/test.png\"}"
+                        : "{\"result\":\"ok\"}";
+                byte[] body = response.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } finally {
@@ -51,6 +57,13 @@ class ImageStorageTimeoutTest {
                     .isInstanceOf(DeveryTimeException.class);
             assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(3));
             assertThat(received.get()).isEqualTo(2);
+            var relaxed = new ImageStorageService(new Cloudinary(ObjectUtils.asMap(
+                    "cloud_name", "test", "api_key", "key", "api_secret", "secret",
+                    "secure", false, "timeout", 5,
+                    "upload_prefix", "http://127.0.0.1:" + server.getAddress().getPort())));
+            assertThat(relaxed.uploadReservedPostImage(image, "posts/test").profileImagePublicId())
+                    .isEqualTo("posts/test");
+            assertThatCode(() -> relaxed.delete("posts/test")).doesNotThrowAnyException();
         } finally {
             server.stop(0);
         }

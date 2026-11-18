@@ -6,7 +6,7 @@ import com.dms.deverytime.domain.post.repository.PostImageCleanupRepository;
 import com.dms.deverytime.domain.post.repository.PostImageRepository;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.global.cloudinary.service.ImageStorageService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -17,15 +17,35 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class PostImageCleanupService {
     private final PostRepository postRepository;
     private final PostImageCleanupRepository cleanupRepository;
     private final PostImageRepository imageRepository;
     private final ImageStorageService storage;
+
+    private final Clock clock;
+    private static final Pattern ENTITY = Pattern.compile("&(?:#[xX][0-9A-Fa-f]{1,8}|#[0-9]{1,8}|[A-Za-z][A-Za-z0-9]{1,31});");
+    private static final Pattern HTML_TAG = Pattern.compile("(?s)<[^>]+>");
+
+    @Autowired
+    public PostImageCleanupService(PostRepository postRepository, PostImageCleanupRepository cleanupRepository,
+                                   PostImageRepository imageRepository, ImageStorageService storage) {
+        this(postRepository, cleanupRepository, imageRepository, storage, Clock.systemDefaultZone());
+    }
+
+    PostImageCleanupService(PostRepository postRepository, PostImageCleanupRepository cleanupRepository,
+                            PostImageRepository imageRepository, ImageStorageService storage, Clock clock) {
+        this.postRepository = postRepository;
+        this.cleanupRepository = cleanupRepository;
+        this.imageRepository = imageRepository;
+        this.storage = storage;
+        this.clock = clock;
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Long recordUploadedFile(Long postId, String publicId) {
@@ -53,7 +73,7 @@ public class PostImageCleanupService {
     }
 
     private void deferMissingCandidate(PostImageCleanup pending) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         if (pending.getRetryDeadline() == null) {
             pending.setRetryDeadline(now.plusDays(7));
         }
@@ -80,7 +100,7 @@ public class PostImageCleanupService {
                 continue;
             }
             if (pending.isUploadCandidate() && pending.getNextRetryAt() != null
-                    && pending.getNextRetryAt().isAfter(LocalDateTime.now())) {
+                    && pending.getNextRetryAt().isAfter(LocalDateTime.now(clock))) {
                 continue;
             }
             try {
@@ -146,20 +166,52 @@ public class PostImageCleanupService {
     }
 
     private static boolean containsImageUrl(String text, String imageUrl) {
-        String unescaped = Parser.unescapeEntities(text, false);
-        if (unescaped.contains(imageUrl)) {
-            return true;
+        var matcher = ENTITY.matcher(text);
+        StringBuffer markdown = new StringBuffer();
+        while (matcher.find()) {
+            matcher.appendReplacement(markdown, java.util.regex.Matcher.quoteReplacement(
+                    Parser.unescapeEntities(matcher.group(), false)));
         }
-        // CommonMark에서는 ASCII 문장부호 앞의 백슬래시를 제거한다.
-        StringBuilder normalized = new StringBuilder(unescaped.length());
-        for (int i = 0; i < unescaped.length(); i++) {
-            char current = unescaped.charAt(i);
-            if (current == '\\' && i + 1 < unescaped.length() && isAsciiPunctuation(unescaped.charAt(i + 1))) {
-                current = unescaped.charAt(++i);
+        matcher.appendTail(markdown);
+        if (containsNormalized(markdown.toString(), imageUrl)) return true;
+
+        // HTML 속성에서는 세미콜론 없는 문자 참조도 브라우저 규칙에 따라 처리한다.
+        var tags = HTML_TAG.matcher(text);
+        while (tags.find()) {
+            if (containsNormalized(Parser.unescapeEntities(tags.group(), true), imageUrl)) return true;
+        }
+        return false;
+    }
+
+    private static boolean containsNormalized(String text, String imageUrl) {
+        StringBuilder normalized = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\\' && i + 1 < text.length() && isAsciiPunctuation(text.charAt(i + 1))) {
+                current = text.charAt(++i);
             }
             normalized.append(current);
         }
-        return normalized.toString().contains(imageUrl);
+        return decodeUnreserved(normalized.toString()).contains(decodeUnreserved(imageUrl));
+    }
+
+    private static String decodeUnreserved(String value) {
+        StringBuilder result = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            if (value.charAt(i) == '%' && i + 2 < value.length()) {
+                int high = Character.digit(value.charAt(i + 1), 16);
+                int low = Character.digit(value.charAt(i + 2), 16);
+                int c = high < 0 || low < 0 ? -1 : (high << 4) + low;
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                        || c == '-' || c == '.' || c == '_' || c == '~') {
+                    result.append((char) c);
+                    i += 2;
+                    continue;
+                }
+            }
+            result.append(value.charAt(i));
+        }
+        return result.toString();
     }
 
     private static boolean isAsciiPunctuation(char c) {

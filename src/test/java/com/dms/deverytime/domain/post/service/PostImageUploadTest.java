@@ -62,6 +62,7 @@ class PostImageUploadTest {
     @Autowired EntityManagerFactory entityManagerFactory;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired DataSource dataSource;
+    @Autowired TestClock clock;
 
     private TransactionTemplate transaction;
     private EntityManager em;
@@ -152,17 +153,24 @@ class PostImageUploadTest {
 
     @Test
     void missingUploadStopsRetryingAfterDeadline() {
-        Long id = cleanupService.recordUploadedFile(postId, "never-uploaded");
-        when(storage.deleteUploadCandidate("never-uploaded")).thenReturn(false);
-        cleanupService.cleanupAfterContentSaved(postId);
-        transaction.executeWithoutResult(status -> {
-            var record = pending.findById(id).orElseThrow();
-            record.deferRetry(java.time.LocalDateTime.now().minusSeconds(1));
-            record.setRetryDeadline(java.time.LocalDateTime.now().minusSeconds(1));
-        });
-        cleanupService.cleanupAfterContentSaved(postId);
-        assertThat(pending.findById(id)).get().satisfies(record -> assertThat(record.isCompleted()).isTrue());
-        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).doesNotContain(postId);
+        var start = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        clock.delegate = java.time.Clock.fixed(start, java.time.ZoneOffset.UTC);
+        try {
+            Long id = cleanupService.recordUploadedFile(postId, "never-uploaded");
+            when(storage.deleteUploadCandidate("never-uploaded")).thenReturn(false);
+            cleanupService.cleanupAfterContentSaved(postId);
+            var deadline = java.time.LocalDateTime.ofInstant(start.plus(java.time.Duration.ofDays(7)), java.time.ZoneOffset.UTC);
+            assertThat(pending.findById(id).orElseThrow().getRetryDeadline()).isEqualTo(deadline);
+            clock.delegate = java.time.Clock.fixed(start.plus(java.time.Duration.ofDays(1)), java.time.ZoneOffset.UTC);
+            cleanupService.cleanupAfterContentSaved(postId);
+            assertThat(pending.findById(id).orElseThrow().getRetryDeadline()).isEqualTo(deadline);
+            assertThat(pending.findById(id).orElseThrow().isCompleted()).isFalse();
+            clock.delegate = java.time.Clock.fixed(start.plus(java.time.Duration.ofDays(7)), java.time.ZoneOffset.UTC);
+            cleanupService.cleanupAfterContentSaved(postId);
+            assertThat(pending.findById(id).orElseThrow().isCompleted()).isTrue();
+        } finally {
+            clock.delegate = java.time.Clock.systemDefaultZone();
+        }
     }
 
     @Test
@@ -388,6 +396,13 @@ class PostImageUploadTest {
                 failure -> assertThat(failure.getErrorCode()).isEqualTo(expected));
     }
 
+    static class TestClock extends java.time.Clock {
+        volatile java.time.Clock delegate = java.time.Clock.systemDefaultZone();
+        public java.time.ZoneId getZone() { return delegate.getZone(); }
+        public java.time.Clock withZone(java.time.ZoneId zone) { return delegate.withZone(zone); }
+        public java.time.Instant instant() { return delegate.instant(); }
+    }
+
     @Configuration
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses = PostRepository.class)
@@ -422,10 +437,13 @@ class PostImageUploadTest {
         }
 
         @Bean
+        TestClock testClock() { return new TestClock(); }
+
+        @Bean
         PostImageCleanupService cleanupService(PostRepository posts,
                                                PostImageCleanupRepository pending, PostImageRepository images,
-                                               ImageStorageService storage) {
-            return new PostImageCleanupService(posts, pending, images, storage);
+                                               ImageStorageService storage, TestClock clock) {
+            return new PostImageCleanupService(posts, pending, images, storage, clock);
         }
 
         @Bean

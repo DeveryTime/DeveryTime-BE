@@ -155,6 +155,26 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void percentEncodedUrlPreservesReplacedFile() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, request("![사진](https://example.com/old%2Epng)"), userId);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
+    void markdownEntityWithoutSemicolonDoesNotBlockDeletion() {
+        service.updatePost(postId, deletionRequest("![사진](https://example.com/old&#46png)", imageId), userId);
+        assertThat(images.findById(imageId)).isEmpty();
+    }
+
+    @Test
+    void htmlEntityWithoutSemicolonBlocksDeletion() {
+        assertError(() -> service.updatePost(postId,
+                deletionRequest("<img src=\"https://example.com/old&#46png\">", imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
     void markdownEscapedImageReferenceBlocksExplicitDeletion() {
         String content = "![사진](https://example.com/old\\.png)";
 
