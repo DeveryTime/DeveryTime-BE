@@ -565,6 +565,43 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void deletingPostAlsoRemovesCurrentImageFromStorage() {
+        service.deletePost(postId, userId);
+
+        assertThat(images.findById(imageId)).isEmpty();
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage).delete("old-file");
+    }
+
+    @Test
+    void deletingPostRetriesCurrentImageIfStorageDeletionFails() {
+        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing()
+                .when(storage).delete("old-file");
+        service.deletePost(postId, userId);
+
+        assertThat(images.findById(imageId)).isEmpty();
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
+        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
+
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage, times(2)).delete("old-file");
+    }
+
+    @Test
+    void rolledBackPostDeletionKeepsCurrentImage() {
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            service.deletePost(postId, userId);
+            failBeforeCommit();
+        })).isInstanceOf(IllegalStateException.class);
+
+        assertThat(images.findById(imageId)).isPresent();
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
     void failedCleanupForDeletedPostIsRetriedWithoutAnotherSave() {
         service.replacePostImage(postId, imageId, file(), userId);
         doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing()

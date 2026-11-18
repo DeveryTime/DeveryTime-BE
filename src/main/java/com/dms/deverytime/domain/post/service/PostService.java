@@ -226,6 +226,13 @@ public class PostService {
 
         validatePostOwner(post, loginUserId);
 
+        // 게시글이 삭제되어도 외부 파일 삭제 실패를 다시 시도할 수 있도록 기록한다.
+        for (PostImage image : postImageRepository.findByPostIdOrderBySortOrder(postId)) {
+            PostImageCleanup cleanup = new PostImageCleanup(postId, image);
+            cleanup.retire();
+            postImageCleanupRepository.save(cleanup);
+        }
+
         // 자식 데이터 먼저 삭제
         commentRepository.deleteByPostId(postId);
         postViewLogRepository.deleteByPostId(postId);
