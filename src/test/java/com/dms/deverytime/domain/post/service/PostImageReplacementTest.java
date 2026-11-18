@@ -40,6 +40,7 @@ class PostImageReplacementTest {
     @Autowired PostService service;
     @Autowired PostImageRepository images;
     @Autowired PostImageCleanupRepository pending;
+    @Autowired PostImageCleanupService cleanupService;
     @Autowired ImageStorageService storage;
     @Autowired EntityManagerFactory factory;
     @Autowired PlatformTransactionManager transactionManager;
@@ -236,24 +237,25 @@ class PostImageReplacementTest {
 
     @Test
     void databaseFailureCleansNewFileAndKeepsOldImage() {
-        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of("x".repeat(501), "new-file"));
+        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of("x".repeat(501), "failed-insert-file"));
         assertThatThrownBy(() -> service.replacePostImage(postId, imageId, file(), userId))
                 .isInstanceOf(RuntimeException.class);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("new-file");
+        verify(storage).delete("failed-insert-file");
         verify(storage, never()).delete("old-file");
     }
 
     @Test
     void commitFailureRollsBackReplacementAndPendingRecord() {
+        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of(NEW_URL, "failed-commit-file"));
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             service.replacePostImage(postId, imageId, file(), userId);
             failBeforeCommit();
         })).isInstanceOf(IllegalStateException.class);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("new-file");
+        verify(storage).delete("failed-commit-file");
         verify(storage, never()).delete("old-file");
     }
 
@@ -312,6 +314,7 @@ class PostImageReplacementTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "https://example.com/old.png",
+            "https://example.com/old\\u002epng",
             "https:\\/\\/example.com\\/old.png",
             "https:&#47;&#47;example.com&#47;old.png"
     })
@@ -540,6 +543,22 @@ class PostImageReplacementTest {
         service.updatePost(postId, request("next save"), userId);
         verify(storage, times(2)).delete("old-file");
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void failedCleanupForDeletedPostIsRetriedWithoutAnotherSave() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing()
+                .when(storage).delete("old-file");
+
+        service.deletePost(postId, userId);
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
+        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
+
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        verify(storage, times(2)).delete("old-file");
     }
 
     @Test

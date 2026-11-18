@@ -34,6 +34,9 @@ public class PostImageCleanup {
     @Column(nullable = false)
     private boolean completed;
 
+    @Column(name = "upload_candidate", nullable = false)
+    private boolean uploadCandidate;
+
     public void retire() {
         this.retired = true;
     }
@@ -47,5 +50,13 @@ public class PostImageCleanup {
         this.imageId = image.getId();
         this.imageUrl = image.getImageUrl();
         this.publicId = image.getPublicId();
+    }
+
+    public PostImageCleanup(Long postId, String publicId) {
+        this.postId = postId;
+        this.imageId = 0L;
+        this.imageUrl = "";
+        this.publicId = publicId;
+        this.uploadCandidate = true;
     }
 }

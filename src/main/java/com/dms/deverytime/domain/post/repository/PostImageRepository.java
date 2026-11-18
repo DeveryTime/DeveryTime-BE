@@ -9,5 +9,6 @@ import java.util.Optional;
 public interface PostImageRepository extends JpaRepository<PostImage, Long> {
     List<PostImage> findByPostIdOrderBySortOrder(Long postId);
     Optional<PostImage> findByIdAndPostId(Long id, Long postId);
+    boolean existsByPublicId(String publicId);
     void deleteByPostId(Long postId);
 }

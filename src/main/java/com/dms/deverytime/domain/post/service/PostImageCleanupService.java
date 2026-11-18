@@ -3,6 +3,7 @@ package com.dms.deverytime.domain.post.service;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.entity.PostImageCleanup;
 import com.dms.deverytime.domain.post.repository.PostImageCleanupRepository;
+import com.dms.deverytime.domain.post.repository.PostImageRepository;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.global.cloudinary.service.ImageStorageService;
 import lombok.RequiredArgsConstructor;
@@ -21,14 +22,41 @@ import tools.jackson.databind.json.JsonMapper;
 public class PostImageCleanupService {
     private final PostRepository postRepository;
     private final PostImageCleanupRepository cleanupRepository;
+    private final PostImageRepository imageRepository;
     private final ImageStorageService storage;
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Long recordUploadedFile(Long postId, String publicId) {
+        return cleanupRepository.saveAndFlush(new PostImageCleanup(postId, publicId)).getId();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void cleanupRolledBackUpload(Long id) {
+        PostImageCleanup pending = cleanupRepository.findByIdForUpdate(id).orElse(null);
+        if (pending == null || pending.isCompleted() || !pending.isUploadCandidate()) {
+            return;
+        }
+        if (!imageRepository.existsByPublicId(pending.getPublicId())) {
+            try {
+                storage.delete(pending.getPublicId());
+            } catch (RuntimeException failure) {
+                log.error("Failed to delete rolled-back upload; cleanup record retained: {}", id, failure);
+                return;
+            }
+        }
+        pending.complete();
+    }
 
     // 본문 저장 트랜잭션이 확정된 후 별도 트랜잭션으로 처리한다.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void cleanupAfterContentSaved(Long postId) {
         Post post = postRepository.findByIdForImageUpload(postId).orElse(null);
-        for (PostImageCleanup pending : cleanupRepository.findByPostIdOrderById(postId)) {
-            if (post != null && !pending.isRetired()) {
+        for (PostImageCleanup pending : cleanupRepository.findPendingForUpdate(postId)) {
+            if (pending.isUploadCandidate() && imageRepository.existsByPublicId(pending.getPublicId())) {
+                pending.complete();
+                continue;
+            }
+            if (post != null && !pending.isRetired() && !pending.isUploadCandidate()) {
                 continue;
             }
             try {
@@ -36,7 +64,7 @@ public class PostImageCleanupService {
                 // 이력은 지우지 않는다. 외부 삭제 후 DB 커밋이 실패해도 retire 기록은 이미 확정되어 있다.
                 pending.complete();
             } catch (RuntimeException failure) {
-                // 기록을 남겨 다음 본문 저장 때 재시도한다. 본문 저장 성공을 실패로 바꾸지 않는다.
+                // 실패한 기록은 정기 재시도 시 다시 처리한다.
                 log.error("Failed to delete replaced post image; cleanup record retained: {}",
                         pending.getId(), failure);
             }
@@ -70,6 +98,13 @@ public class PostImageCleanupService {
         }
         if (node.isString()) {
             return HtmlUtils.htmlUnescape(node.stringValue()).contains(imageUrl);
+        }
+        if (node.isObject()) {
+            for (var property : node.properties()) {
+                if (HtmlUtils.htmlUnescape(property.getKey()).contains(imageUrl)) {
+                    return true;
+                }
+            }
         }
         for (JsonNode child : node.values()) {
             if (referencesImage(child, imageUrl)) {

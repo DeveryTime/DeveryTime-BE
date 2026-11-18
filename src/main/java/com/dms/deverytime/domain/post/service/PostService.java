@@ -262,12 +262,15 @@ public class PostService {
                 .max()
                 .orElse(-1) + 1;
         List<String> uploadedPublicIds = new ArrayList<>();
-        registerUploadRollbackCleanup(uploadedPublicIds);
+        List<Long> cleanupIds = new ArrayList<>();
+        registerUploadRollbackCleanup(postId, uploadedPublicIds, cleanupIds);
 
         List<PostImageResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
             ImageUploadResult result = imageStorageService.upload(file, "posts");
             uploadedPublicIds.add(result.profileImagePublicId());
+            cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId()));
+            uploadedPublicIds.remove(result.profileImagePublicId());
             PostImage image = postImageRepository.save(new PostImage(
                     post, result.profileImageUrl(), result.profileImagePublicId(), nextOrder++));
             responses.add(PostImageResponse.from(image));
@@ -286,9 +289,12 @@ public class PostService {
         imageStorageService.validateImage(file);
 
         List<String> uploadedPublicIds = new ArrayList<>();
-        registerUploadRollbackCleanup(uploadedPublicIds);
+        List<Long> cleanupIds = new ArrayList<>();
+        registerUploadRollbackCleanup(postId, uploadedPublicIds, cleanupIds);
         ImageUploadResult result = imageStorageService.upload(file, "posts");
         uploadedPublicIds.add(result.profileImagePublicId());
+        cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId()));
+        uploadedPublicIds.remove(result.profileImagePublicId());
 
         postImageCleanupRepository.save(new PostImageCleanup(postId, image));
         image.replaceFile(result.profileImageUrl(), result.profileImagePublicId());
@@ -309,7 +315,7 @@ public class PostService {
         });
     }
 
-    private void registerUploadRollbackCleanup(List<String> uploadedPublicIds) {
+    private void registerUploadRollbackCleanup(Long postId, List<String> uploadedPublicIds, List<Long> cleanupIds) {
         // 메서드 내부 예외뿐 아니라 트랜잭션 커밋 실패에 의한 롤백도 처리한다.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -318,16 +324,29 @@ public class PostService {
                     log.error("Image upload transaction outcome unknown; cleanup requires verification: {}",
                             uploadedPublicIds);
                 }
-                if (status != STATUS_ROLLED_BACK) {
+                if (status == STATUS_ROLLED_BACK) {
+                    for (Long cleanupId : cleanupIds) {
+                        try {
+                            postImageCleanupService.cleanupRolledBackUpload(cleanupId);
+                        } catch (RuntimeException cleanupFailure) {
+                            log.error("Rolled-back image cleanup retained for retry: {}", cleanupId, cleanupFailure);
+                        }
+                    }
+                    for (String publicId : uploadedPublicIds) {
+                        try {
+                            imageStorageService.delete(publicId);
+                        } catch (RuntimeException cleanupFailure) {
+                            log.error("Failed to clean up unrecorded post image: {}", publicId, cleanupFailure);
+                        }
+                    }
+                }
+                if (status != STATUS_COMMITTED) {
                     return;
                 }
-                for (String publicId : uploadedPublicIds) {
-                    try {
-                        imageStorageService.delete(publicId);
-                    } catch (RuntimeException cleanupFailure) {
-                        // 한 파일 정리 실패가 다른 파일 정리나 원래 오류를 가리지 않게 한다.
-                        log.error("Failed to clean up rolled-back post image: {}", publicId, cleanupFailure);
-                    }
+                try {
+                    postImageCleanupService.cleanupAfterContentSaved(postId);
+                } catch (RuntimeException cleanupFailure) {
+                    log.error("Post image cleanup retained for retry: {}", postId, cleanupFailure);
                 }
             }
         });

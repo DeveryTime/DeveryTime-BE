@@ -56,6 +56,8 @@ import static org.mockito.Mockito.*;
 class PostImageUploadTest {
     @Autowired PostService service;
     @Autowired PostImageRepository images;
+    @Autowired PostImageCleanupRepository pending;
+    @Autowired PostImageCleanupService cleanupService;
     @Autowired ImageStorageService storage;
     @Autowired EntityManagerFactory entityManagerFactory;
     @Autowired PlatformTransactionManager transactionManager;
@@ -167,7 +169,10 @@ class PostImageUploadTest {
 
     @Test
     void commitPhaseFailureAlsoCleansUploadedFilesAndContinuesAfterCleanupFailure() {
-        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).when(storage).delete("public-1");
+        when(storage.upload(any(), eq("posts")))
+                .thenReturn(ImageUploadResult.of("https://example.com/failed1", "failed-upload-1"))
+                .thenReturn(ImageUploadResult.of("https://example.com/failed2", "failed-upload-2"));
+        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing().when(storage).delete("failed-upload-1");
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             service.uploadPostImages(postId, List.of(file(), file()), userId);
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -178,8 +183,25 @@ class PostImageUploadTest {
             });
         })).isInstanceOf(IllegalStateException.class);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
-        verify(storage).delete("public-1");
-        verify(storage).delete("public-2");
+        verify(storage).delete("failed-upload-1");
+        verify(storage).delete("failed-upload-2");
+        assertThat(pending.findByPostIdOrderById(postId)).singleElement()
+                .satisfies(record -> assertThat(record.isUploadCandidate()).isTrue());
+        new PostImageCleanupRetry(pending, cleanupService).retryPendingCleanup();
+        verify(storage, times(2)).delete("failed-upload-1");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void retryPreservesUploadedFileWhenImageWasCommitted() {
+        service.uploadPostImages(postId, List.of(file()), userId);
+        cleanupService.recordUploadedFile(postId, "public-1");
+
+        new PostImageCleanupRetry(pending, cleanupService).retryPendingCleanup();
+
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
+        verify(storage, never()).delete("public-1");
     }
 
     @Test
@@ -271,8 +293,9 @@ class PostImageUploadTest {
 
         @Bean
         PostImageCleanupService cleanupService(PostRepository posts,
-                                               PostImageCleanupRepository pending, ImageStorageService storage) {
-            return new PostImageCleanupService(posts, pending, storage);
+                                               PostImageCleanupRepository pending, PostImageRepository images,
+                                               ImageStorageService storage) {
+            return new PostImageCleanupService(posts, pending, images, storage);
         }
 
         @Bean

@@ -298,8 +298,8 @@ class PostUpdateContractTest {
             return mock(ImageStorageService.class);
         }
         @Bean PostImageCleanupService cleanupService(PostRepository posts, PostImageCleanupRepository pending,
-                                                     ImageStorageService storage) {
-            return new PostImageCleanupService(posts, pending, storage);
+                                                     PostImageRepository images, ImageStorageService storage) {
+            return new PostImageCleanupService(posts, pending, images, storage);
         }
         @Bean PostService postService(PostRepository posts, CategoryRepository categories,
                                       PostImageRepository images, PostImageCleanupRepository pending,
