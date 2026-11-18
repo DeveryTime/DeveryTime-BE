@@ -42,6 +42,13 @@ public class PostImageCleanup {
     @Column(name = "next_retry_at")
     private LocalDateTime nextRetryAt;
 
+    @Column(name = "retry_deadline")
+    private LocalDateTime retryDeadline;
+
+    public void setRetryDeadline(LocalDateTime retryDeadline) {
+        this.retryDeadline = retryDeadline;
+    }
+
     public void deferRetry(LocalDateTime nextRetryAt) {
         this.nextRetryAt = nextRetryAt;
     }

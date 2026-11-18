@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,6 @@ public interface PostImageCleanupRepository extends JpaRepository<PostImageClean
 
     @Query("SELECT DISTINCT c.postId FROM PostImageCleanup c WHERE c.completed = false AND " +
             "(c.retired = true OR c.uploadCandidate = true OR NOT EXISTS (SELECT p.id FROM Post p WHERE p.id = c.postId)) AND " +
-            "(c.uploadCandidate = false OR c.nextRetryAt IS NULL OR c.nextRetryAt <= CURRENT_TIMESTAMP)")
-    List<Long> findPostIdsWithRetryableCleanup();
+            "(c.uploadCandidate = false OR c.nextRetryAt IS NULL OR c.nextRetryAt <= :now)")
+    List<Long> findPostIdsWithRetryableCleanup(@Param("now") LocalDateTime now);
 }

@@ -29,10 +29,7 @@ class ImageStorageUploadTest {
 
         assertThat(result.profileImagePublicId()).isEqualTo("posts/reserved");
         verify(uploader).upload(any(byte[].class), argThat(options ->
-                "posts/reserved".equals(options.get("public_id")) && Boolean.FALSE.equals(options.get("overwrite"))
-                        && Integer.valueOf(10).equals(options.get("connect_timeout"))
-                        && Integer.valueOf(10).equals(options.get("connection_request_timeout"))
-                        && Integer.valueOf(30).equals(options.get("timeout"))));
+                "posts/reserved".equals(options.get("public_id")) && Boolean.FALSE.equals(options.get("overwrite"))));
     }
 
     @Test

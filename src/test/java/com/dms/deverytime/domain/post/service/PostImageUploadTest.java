@@ -121,7 +121,7 @@ class PostImageUploadTest {
         cleanupService.recordUploadedFile(postId, "reserved-interrupted-upload");
 
         PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
-        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        when(retryQueue.findPostIdsWithRetryableCleanup(any())).thenReturn(List.of(postId));
         new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
 
         verify(storage).deleteUploadCandidate("reserved-interrupted-upload");
@@ -138,16 +138,31 @@ class PostImageUploadTest {
             assertThat(record.isCompleted()).isFalse();
             assertThat(record.getNextRetryAt()).isAfter(java.time.LocalDateTime.now());
         });
-        assertThat(pending.findPostIdsWithRetryableCleanup()).doesNotContain(postId);
+        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).doesNotContain(postId);
         cleanupService.cleanupAfterContentSaved(postId);
         verify(storage, times(1)).deleteUploadCandidate("delayed-upload");
 
         transaction.executeWithoutResult(status -> pending.findById(id).orElseThrow()
                 .deferRetry(java.time.LocalDateTime.now().minusSeconds(1)));
-        assertThat(pending.findPostIdsWithRetryableCleanup()).contains(postId);
+        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).contains(postId);
         cleanupService.cleanupAfterContentSaved(postId);
         assertThat(pending.findById(id)).get().satisfies(record -> assertThat(record.isCompleted()).isTrue());
         verify(storage, times(2)).deleteUploadCandidate("delayed-upload");
+    }
+
+    @Test
+    void missingUploadStopsRetryingAfterDeadline() {
+        Long id = cleanupService.recordUploadedFile(postId, "never-uploaded");
+        when(storage.deleteUploadCandidate("never-uploaded")).thenReturn(false);
+        cleanupService.cleanupAfterContentSaved(postId);
+        transaction.executeWithoutResult(status -> {
+            var record = pending.findById(id).orElseThrow();
+            record.deferRetry(java.time.LocalDateTime.now().minusSeconds(1));
+            record.setRetryDeadline(java.time.LocalDateTime.now().minusSeconds(1));
+        });
+        cleanupService.cleanupAfterContentSaved(postId);
+        assertThat(pending.findById(id)).get().satisfies(record -> assertThat(record.isCompleted()).isTrue());
+        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).doesNotContain(postId);
     }
 
     @Test

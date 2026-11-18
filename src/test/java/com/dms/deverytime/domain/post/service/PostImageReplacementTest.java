@@ -140,6 +140,21 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void html5NamedEntityReferencePreservesReplacedFile() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, request("![사진](https://example.com/old&period;png)"), userId);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
+    void html5NamedEntityReferenceBlocksDeletion() {
+        assertError(() -> service.updatePost(postId,
+                deletionRequest("![사진](https://example.com/old&period;png)", imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
     void markdownEscapedImageReferenceBlocksExplicitDeletion() {
         String content = "![사진](https://example.com/old\\.png)";
 
@@ -627,7 +642,7 @@ class PostImageReplacementTest {
         assertThat(images.findById(imageId)).isEmpty();
         assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
         PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
-        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        when(retryQueue.findPostIdsWithRetryableCleanup(any())).thenReturn(List.of(postId));
         new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
 
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
@@ -655,7 +670,7 @@ class PostImageReplacementTest {
         service.deletePost(postId, userId);
         assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
         PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
-        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        when(retryQueue.findPostIdsWithRetryableCleanup(any())).thenReturn(List.of(postId));
         new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
 
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();

@@ -20,8 +20,6 @@ public class ImageStorageService {
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
     private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-    private static final int CONNECT_TIMEOUT_SECONDS = 10;
-    private static final int RESPONSE_TIMEOUT_SECONDS = 30;
 
     public String newPostImagePublicId() {
         return "posts/" + UUID.randomUUID();
@@ -31,9 +29,7 @@ public class ImageStorageService {
         validateImage(file);
         try {
             Map result = cloudinary.uploader().upload(file.getBytes(),
-                    ObjectUtils.asMap("public_id", publicId, "overwrite", false,
-                            "connect_timeout", CONNECT_TIMEOUT_SECONDS, "connection_request_timeout", CONNECT_TIMEOUT_SECONDS,
-                            "timeout", RESPONSE_TIMEOUT_SECONDS));
+                    ObjectUtils.asMap("public_id", publicId, "overwrite", false));
             if (!publicId.equals(result.get("public_id"))) {
                 throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
             }
@@ -71,8 +67,7 @@ public class ImageStorageService {
 
     private boolean deleteIfPresent(String publicId) {
         try {
-            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true, "connect_timeout", CONNECT_TIMEOUT_SECONDS,
-                    "connection_request_timeout", CONNECT_TIMEOUT_SECONDS, "timeout", RESPONSE_TIMEOUT_SECONDS));
+            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
             if ("ok".equals(result.get("result"))) return true;
             if ("not found".equals(result.get("result"))) return false;
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);

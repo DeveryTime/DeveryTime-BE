@@ -39,10 +39,6 @@ class ImageStorageDeleteTest {
 
         assertThat(storage.deleteUploadCandidate("file")).isFalse();
         assertThat(storage.deleteUploadCandidate("file")).isTrue();
-        verify(uploader, times(2)).destroy(eq("file"), argThat(options ->
-                Integer.valueOf(10).equals(options.get("connect_timeout"))
-                        && Integer.valueOf(10).equals(options.get("connection_request_timeout"))
-                        && Integer.valueOf(30).equals(options.get("timeout"))));
     }
 
     @Test

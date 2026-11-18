@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.HtmlUtils;
+import org.jsoup.parser.Parser;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -41,7 +41,7 @@ public class PostImageCleanupService {
         if (!imageRepository.existsByPublicId(pending.getPublicId())) {
             try {
                 if (!storage.deleteUploadCandidate(pending.getPublicId())) {
-                    pending.deferRetry(LocalDateTime.now().plusHours(6));
+                    deferMissingCandidate(pending);
                     return;
                 }
             } catch (RuntimeException failure) {
@@ -50,6 +50,21 @@ public class PostImageCleanupService {
             }
         }
         pending.complete();
+    }
+
+    private void deferMissingCandidate(PostImageCleanup pending) {
+        LocalDateTime now = LocalDateTime.now();
+        if (pending.getRetryDeadline() == null) {
+            pending.setRetryDeadline(now.plusDays(7));
+        }
+        if (!pending.getRetryDeadline().isAfter(now)) {
+            // 파일이 없는 상태가 7일 지속된 경우 자동 재시도를 종료한다.
+            log.warn("Upload cleanup expired after seven days: id={}, publicId={}",
+                    pending.getId(), pending.getPublicId());
+            pending.complete();
+        } else {
+            pending.deferRetry(now.plusHours(6));
+        }
     }
 
     // 본문 저장 트랜잭션이 확정된 후 별도 트랜잭션으로 처리한다.
@@ -71,7 +86,7 @@ public class PostImageCleanupService {
             try {
                 if (pending.isUploadCandidate()) {
                     if (!storage.deleteUploadCandidate(pending.getPublicId())) {
-                        pending.deferRetry(LocalDateTime.now().plusHours(6));
+                        deferMissingCandidate(pending);
                         continue;
                     }
                 } else {
@@ -131,7 +146,7 @@ public class PostImageCleanupService {
     }
 
     private static boolean containsImageUrl(String text, String imageUrl) {
-        String unescaped = HtmlUtils.htmlUnescape(text);
+        String unescaped = Parser.unescapeEntities(text, false);
         if (unescaped.contains(imageUrl)) {
             return true;
         }
