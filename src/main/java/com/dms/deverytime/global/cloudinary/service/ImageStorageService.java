@@ -6,12 +6,14 @@ import com.dms.deverytime.global.cloudinary.dto.ImageUploadResult;
 import com.dms.deverytime.global.exception.DeveryTimeException;
 import com.dms.deverytime.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.tika.Tika;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ImageStorageService {
@@ -30,6 +32,7 @@ public class ImageStorageService {
                     file.getBytes(), ObjectUtils.asMap("folder", folder));
 
         } catch (IOException | RuntimeException e) {
+            log.error("Cloudinary 이미지 업로드 실패: {}", e.getMessage());
             throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
         }
 
