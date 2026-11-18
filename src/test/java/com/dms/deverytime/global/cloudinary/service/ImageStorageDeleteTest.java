@@ -29,6 +29,23 @@ class ImageStorageDeleteTest {
     }
 
     @Test
+    void missingUploadCandidateIsNotConsideredCleanedUp() throws Exception {
+        Cloudinary cloudinary = mock(Cloudinary.class);
+        Uploader uploader = mock(Uploader.class);
+        when(cloudinary.uploader()).thenReturn(uploader);
+        when(uploader.destroy(eq("file"), anyMap()))
+                .thenReturn(Map.of("result", "not found"), Map.of("result", "ok"));
+        ImageStorageService storage = new ImageStorageService(cloudinary);
+
+        assertThat(storage.deleteUploadCandidate("file")).isFalse();
+        assertThat(storage.deleteUploadCandidate("file")).isTrue();
+        verify(uploader, times(2)).destroy(eq("file"), argThat(options ->
+                Integer.valueOf(10).equals(options.get("connect_timeout"))
+                        && Integer.valueOf(10).equals(options.get("connection_request_timeout"))
+                        && Integer.valueOf(30).equals(options.get("timeout"))));
+    }
+
+    @Test
     void unsuccessfulStorageResponseIsNotTreatedAsSuccessfulDeletion() throws Exception {
         Cloudinary cloudinary = mock(Cloudinary.class);
         Uploader uploader = mock(Uploader.class);

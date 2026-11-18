@@ -57,6 +57,7 @@ class PostImageReplacementTest {
     @BeforeEach
     void setUp() {
         reset(storage);
+        when(storage.deleteUploadCandidate(anyString())).thenReturn(true);
         transaction = new TransactionTemplate(transactionManager);
         em = SharedEntityManagerCreator.createSharedEntityManager(factory);
         transaction.executeWithoutResult(status -> {
@@ -291,7 +292,7 @@ class PostImageReplacementTest {
         assertError(() -> service.replacePostImage(postId, imageId, file(), userId), ErrorCode.IMAGE_UPLOAD_FAILED);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("failed-upload-replacement-unique");
+        verify(storage).deleteUploadCandidate("failed-upload-replacement-unique");
     }
 
     @Test
@@ -302,7 +303,7 @@ class PostImageReplacementTest {
                 .isInstanceOf(RuntimeException.class);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("failed-insert-file");
+        verify(storage).deleteUploadCandidate("failed-insert-file");
         verify(storage, never()).delete("old-file");
     }
 
@@ -316,7 +317,7 @@ class PostImageReplacementTest {
         })).isInstanceOf(IllegalStateException.class);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage).delete("failed-commit-file");
+        verify(storage).deleteUploadCandidate("failed-commit-file");
         verify(storage, never()).delete("old-file");
     }
 

@@ -72,6 +72,7 @@ class PostImageUploadTest {
     @BeforeEach
     void setUp() {
         reset(storage);
+        when(storage.deleteUploadCandidate(anyString())).thenReturn(true);
         transaction = new TransactionTemplate(transactionManager);
         em = SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
         transaction.executeWithoutResult(status -> {
@@ -123,8 +124,30 @@ class PostImageUploadTest {
         when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
         new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
 
-        verify(storage).delete("reserved-interrupted-upload");
+        verify(storage).deleteUploadCandidate("reserved-interrupted-upload");
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void missingDelayedUploadRemainsPendingUntilItAppears() {
+        Long id = cleanupService.recordUploadedFile(postId, "delayed-upload");
+        when(storage.deleteUploadCandidate("delayed-upload")).thenReturn(false, true);
+
+        cleanupService.cleanupAfterContentSaved(postId);
+        assertThat(pending.findById(id)).get().satisfies(record -> {
+            assertThat(record.isCompleted()).isFalse();
+            assertThat(record.getNextRetryAt()).isAfter(java.time.LocalDateTime.now());
+        });
+        assertThat(pending.findPostIdsWithRetryableCleanup()).doesNotContain(postId);
+        cleanupService.cleanupAfterContentSaved(postId);
+        verify(storage, times(1)).deleteUploadCandidate("delayed-upload");
+
+        transaction.executeWithoutResult(status -> pending.findById(id).orElseThrow()
+                .deferRetry(java.time.LocalDateTime.now().minusSeconds(1)));
+        assertThat(pending.findPostIdsWithRetryableCleanup()).contains(postId);
+        cleanupService.cleanupAfterContentSaved(postId);
+        assertThat(pending.findById(id)).get().satisfies(record -> assertThat(record.isCompleted()).isTrue());
+        verify(storage, times(2)).deleteUploadCandidate("delayed-upload");
     }
 
     @Test
@@ -151,7 +174,7 @@ class PostImageUploadTest {
             release.countDown();
             assertThat(upload.get(5, TimeUnit.SECONDS)).hasSize(1);
             retry.get(5, TimeUnit.SECONDS);
-            verify(storage, never()).delete("active-upload-unique");
+            verify(storage, never()).deleteUploadCandidate("active-upload-unique");
             assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
         } finally {
             release.countDown();
@@ -242,7 +265,7 @@ class PostImageUploadTest {
         assertError(() -> service.uploadPostImages(postId, List.of(file(), file()), userId),
                 ErrorCode.IMAGE_UPLOAD_FAILED);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
-        verify(storage).delete("first");
+        verify(storage).deleteUploadCandidate("first");
     }
 
     @Test
@@ -253,7 +276,7 @@ class PostImageUploadTest {
         assertThatThrownBy(() -> service.uploadPostImages(postId, List.of(file()), userId))
                 .isInstanceOf(RuntimeException.class);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
-        verify(storage).delete("too-long-url");
+        verify(storage).deleteUploadCandidate("too-long-url");
     }
 
     @Test
@@ -262,7 +285,8 @@ class PostImageUploadTest {
         when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("https://example.com/failed1", "failed-upload-1"))
                 .thenReturn(ImageUploadResult.of("https://example.com/failed2", "failed-upload-2"));
-        doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing().when(storage).delete("failed-upload-1");
+        when(storage.deleteUploadCandidate("failed-upload-1"))
+                .thenThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).thenReturn(true);
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             service.uploadPostImages(postId, List.of(file(), file()), userId);
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -273,12 +297,12 @@ class PostImageUploadTest {
             });
         })).isInstanceOf(IllegalStateException.class);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
-        verify(storage).delete("failed-upload-1");
-        verify(storage).delete("failed-upload-2");
+        verify(storage).deleteUploadCandidate("failed-upload-1");
+        verify(storage).deleteUploadCandidate("failed-upload-2");
         assertThat(pending.findByPostIdOrderById(postId)).singleElement()
                 .satisfies(record -> assertThat(record.isUploadCandidate()).isTrue());
         new PostImageCleanupRetry(pending, cleanupService).retryPendingCleanup();
-        verify(storage, times(2)).delete("failed-upload-1");
+        verify(storage, times(2)).deleteUploadCandidate("failed-upload-1");
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
     }
 
@@ -291,7 +315,7 @@ class PostImageUploadTest {
 
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
         assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
-        verify(storage, never()).delete("public-1");
+        verify(storage, never()).deleteUploadCandidate("public-1");
     }
 
     @Test

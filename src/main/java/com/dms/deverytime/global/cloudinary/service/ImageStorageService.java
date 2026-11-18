@@ -20,6 +20,8 @@ public class ImageStorageService {
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
     private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+    private static final int CONNECT_TIMEOUT_SECONDS = 10;
+    private static final int RESPONSE_TIMEOUT_SECONDS = 30;
 
     public String newPostImagePublicId() {
         return "posts/" + UUID.randomUUID();
@@ -29,7 +31,9 @@ public class ImageStorageService {
         validateImage(file);
         try {
             Map result = cloudinary.uploader().upload(file.getBytes(),
-                    ObjectUtils.asMap("public_id", publicId, "overwrite", false));
+                    ObjectUtils.asMap("public_id", publicId, "overwrite", false,
+                            "connect_timeout", CONNECT_TIMEOUT_SECONDS, "connection_request_timeout", CONNECT_TIMEOUT_SECONDS,
+                            "timeout", RESPONSE_TIMEOUT_SECONDS));
             if (!publicId.equals(result.get("public_id"))) {
                 throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
             }
@@ -56,13 +60,22 @@ public class ImageStorageService {
                 uploadResult.get("public_id").toString());
     }
 
-    public void delete(String publicId){
+    public void delete(String publicId) {
+        deleteIfPresent(publicId);
+    }
+
+    // 업로드 결과가 불확실할 때 not found는 아직 업로드 중일 가능성이 있다.
+    public boolean deleteUploadCandidate(String publicId) {
+        return deleteIfPresent(publicId);
+    }
+
+    private boolean deleteIfPresent(String publicId) {
         try {
-            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
-            // 이미 삭제된 파일도 성공으로 처리해 안전하게 재시도할 수 있게 한다.
-            if (!("ok".equals(result.get("result")) || "not found".equals(result.get("result")))) {
-                throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
-            }
+            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true, "connect_timeout", CONNECT_TIMEOUT_SECONDS,
+                    "connection_request_timeout", CONNECT_TIMEOUT_SECONDS, "timeout", RESPONSE_TIMEOUT_SECONDS));
+            if ("ok".equals(result.get("result"))) return true;
+            if ("not found".equals(result.get("result"))) return false;
+            throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         }

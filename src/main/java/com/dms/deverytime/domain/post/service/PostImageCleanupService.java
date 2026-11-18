@@ -16,6 +16,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.LocalDateTime;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -38,7 +40,10 @@ public class PostImageCleanupService {
         }
         if (!imageRepository.existsByPublicId(pending.getPublicId())) {
             try {
-                storage.delete(pending.getPublicId());
+                if (!storage.deleteUploadCandidate(pending.getPublicId())) {
+                    pending.deferRetry(LocalDateTime.now().plusHours(6));
+                    return;
+                }
             } catch (RuntimeException failure) {
                 log.error("Failed to delete rolled-back upload; cleanup record retained: {}", id, failure);
                 return;
@@ -59,8 +64,19 @@ public class PostImageCleanupService {
             if (post != null && !pending.isRetired() && !pending.isUploadCandidate()) {
                 continue;
             }
+            if (pending.isUploadCandidate() && pending.getNextRetryAt() != null
+                    && pending.getNextRetryAt().isAfter(LocalDateTime.now())) {
+                continue;
+            }
             try {
-                storage.delete(pending.getPublicId());
+                if (pending.isUploadCandidate()) {
+                    if (!storage.deleteUploadCandidate(pending.getPublicId())) {
+                        pending.deferRetry(LocalDateTime.now().plusHours(6));
+                        continue;
+                    }
+                } else {
+                    storage.delete(pending.getPublicId());
+                }
                 // 이력은 지우지 않는다. 외부 삭제 후 DB 커밋이 실패해도 retire 기록은 이미 확정되어 있다.
                 pending.complete();
             } catch (RuntimeException failure) {

@@ -24,6 +24,7 @@ public interface PostImageCleanupRepository extends JpaRepository<PostImageClean
     List<PostImageCleanup> findByPostIdAndRetiredTrue(Long postId);
 
     @Query("SELECT DISTINCT c.postId FROM PostImageCleanup c WHERE c.completed = false AND " +
-            "(c.retired = true OR c.uploadCandidate = true OR NOT EXISTS (SELECT p.id FROM Post p WHERE p.id = c.postId))")
+            "(c.retired = true OR c.uploadCandidate = true OR NOT EXISTS (SELECT p.id FROM Post p WHERE p.id = c.postId)) AND " +
+            "(c.uploadCandidate = false OR c.nextRetryAt IS NULL OR c.nextRetryAt <= CURRENT_TIMESTAMP)")
     List<Long> findPostIdsWithRetryableCleanup();
 }

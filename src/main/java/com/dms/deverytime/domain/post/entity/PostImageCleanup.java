@@ -5,6 +5,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 // 교체 직후에는 본문이 이전 URL을 사용할 수 있어, 정리할 파일을 영속적으로 보관한다.
 @Entity
 @Table(name = "post_image_cleanup", indexes = @Index(name = "idx_post_image_cleanup_post", columnList = "post_id"))
@@ -36,6 +38,13 @@ public class PostImageCleanup {
 
     @Column(name = "upload_candidate", nullable = false)
     private boolean uploadCandidate;
+
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
+
+    public void deferRetry(LocalDateTime nextRetryAt) {
+        this.nextRetryAt = nextRetryAt;
+    }
 
     public void retire() {
         this.retired = true;
