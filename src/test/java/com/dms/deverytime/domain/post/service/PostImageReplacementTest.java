@@ -172,6 +172,7 @@ class PostImageReplacementTest {
         service.replacePostImage(postId, imageId, file(), userId);
         service.updatePost(postId, request("<!-- unclosed <img src=\"https://example.com/old&#46png\">"), userId);
         verify(storage, never()).delete("old-file");
+        assertOldFileStillPending();
     }
 
     @Test
@@ -190,6 +191,34 @@ class PostImageReplacementTest {
         html.append("src=\"https://example.com/old&#46png\">");
         service.updatePost(postId, request(html.toString()), userId);
         verify(storage, never()).delete("old-file");
+        assertOldFileStillPending();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"&#9;", "&#10;", "&#13;", "\t", "\n", "\r"})
+    void htmlUrlWithWhitespacePreservesReplacedImage(String whitespace) {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, request("<img src=\"https://example.com/old" + whitespace + ".png\">"), userId);
+        verify(storage, never()).delete("old-file");
+        assertOldFileStillPending();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"&#9;", "&#10;", "&#13;", "\t", "\n", "\r"})
+    void htmlUrlWithWhitespaceBlocksImageDeletion(String whitespace) {
+        String content = "<img src=\"https://example.com/old" + whitespace + ".png\">";
+        assertError(() -> service.updatePost(postId, deletionRequest(content, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+    }
+
+    private void assertOldFileStillPending() {
+        transaction.executeWithoutResult(status -> assertThat(pending.findByPostIdOrderById(postId))
+                .filteredOn(record -> record.getPublicId().equals("old-file"))
+                .singleElement().satisfies(record -> {
+                    assertThat(record.isRetired()).isFalse();
+                    assertThat(record.isCompleted()).isFalse();
+                }));
     }
 
     @Test

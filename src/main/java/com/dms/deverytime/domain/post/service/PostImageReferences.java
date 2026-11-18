@@ -58,6 +58,7 @@ final class PostImageReferences {
     }
 
     private static String normalize(String value) {
+        value = value.replace("\t", "").replace("\n", "").replace("\r", "");
         StringBuilder result = new StringBuilder(value.length());
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
