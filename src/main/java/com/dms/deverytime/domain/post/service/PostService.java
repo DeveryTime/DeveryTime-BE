@@ -169,9 +169,11 @@ public class PostService {
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.CATEGORY_NOT_FOUND));
         PostCreateStatus status = request.getStatus() == null ? post.getStatus() : request.getStatus();
 
+        PostImageReferences references = PostImageReferences.from(request.getContent());
+
         // 이미 본문에서 제거한 이전 파일 URL은 뒤늦은 편집 요청으로 되살릴 수 없다.
         for (PostImageCleanup retired : postImageCleanupRepository.findByPostIdAndRetiredTrue(postId)) {
-            if (PostImageCleanupService.referencesImageInRequest(request.getContent(), retired.getImageUrl())) {
+            if (references.contains(retired.getImageUrl())) {
                 throw new DeveryTimeException(ErrorCode.POST_IMAGE_CONTENT_CONFLICT);
             }
         }
@@ -187,9 +189,9 @@ public class PostService {
         // 교체 후 아직 본문에 남아 있는 이전 URL도 삭제 전에 함께 검증한다.
         List<PostImageCleanup> pending = postImageCleanupRepository.findByPostIdOrderById(postId);
         for (PostImage image : deletedImages) {
-            if (PostImageCleanupService.referencesImageInRequest(request.getContent(), image.getImageUrl())
+            if (references.contains(image.getImageUrl())
                     || pending.stream().anyMatch(cleanup -> cleanup.getImageId().equals(image.getId())
-                    && PostImageCleanupService.referencesImageInRequest(request.getContent(), cleanup.getImageUrl()))) {
+                    && references.contains(cleanup.getImageUrl()))) {
                 throw new DeveryTimeException(ErrorCode.VALIDATION_ERROR);
             }
         }
@@ -204,7 +206,7 @@ public class PostService {
 
         // 정리 대상 확정은 본문 저장과 함께 커밋한다. 외부 파일 삭제는 그 뒤에 수행한다.
         for (PostImageCleanup cleanup : pending) {
-            if (cleanup.isRetired() || PostImageCleanupService.referencesImage(request.getContent(), cleanup.getImageUrl())) {
+            if (cleanup.isRetired() || references.contains(cleanup.getImageUrl())) {
                 continue;
             }
             // 새 사진이 본문에 없어도, 이전 URL이 제거되었으면 이전 파일은 정리한다.

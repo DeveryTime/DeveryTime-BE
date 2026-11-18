@@ -168,6 +168,22 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void htmlAttributeWithQuotedGreaterThanPreservesReferencedImage() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        String html = "<img alt=\"a > b\" src=\"https://example.com/old&#46png\">";
+        service.updatePost(postId, request(html), userId);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
+    void htmlAttributeWithQuotedGreaterThanBlocksDeletion() {
+        String html = "<img alt=\"a > b\" src=\"https://example.com/old&#46png\">";
+        assertError(() -> service.updatePost(postId, deletionRequest(html, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
     void htmlEntityWithoutSemicolonBlocksDeletion() {
         assertError(() -> service.updatePost(postId,
                 deletionRequest("<img src=\"https://example.com/old&#46png\">", imageId), userId),

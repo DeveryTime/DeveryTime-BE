@@ -11,14 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.jsoup.parser.Parser;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 
 import java.time.LocalDateTime;
 import java.time.Clock;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -29,8 +24,6 @@ public class PostImageCleanupService {
     private final ImageStorageService storage;
 
     private final Clock clock;
-    private static final Pattern ENTITY = Pattern.compile("&(?:#[xX][0-9A-Fa-f]{1,8}|#[0-9]{1,8}|[A-Za-z][A-Za-z0-9]{1,31});");
-    private static final Pattern HTML_TAG = Pattern.compile("(?s)<[^>]+>");
 
     @Autowired
     public PostImageCleanupService(PostRepository postRepository, PostImageCleanupRepository cleanupRepository,
@@ -122,100 +115,4 @@ public class PostImageCleanupService {
         }
     }
 
-    // 본문은 Markdown 문자열이다. JSON으로 직렬화된 기존 본문도 호환한다.
-    static boolean referencesImageInRequest(String content, String imageUrl) {
-        if (content == null) {
-            return false;
-        }
-        // 유효한 JSON이어도 객체 키에 사진 URL이 포함될 수 있다.
-        if (containsImageUrl(content, imageUrl)) {
-            return true;
-        }
-        try {
-            return referencesImage(JsonMapper.shared().readTree(content), imageUrl);
-        } catch (JacksonException notJson) {
-            return false;
-        }
-    }
-
-    static boolean referencesImage(String content, String imageUrl) {
-        // [링크](URL), 인용문 등으로 시작하는 Markdown도 정상적인 본문이다.
-        return referencesImageInRequest(content, imageUrl);
-    }
-
-    private static boolean referencesImage(JsonNode node, String imageUrl) {
-        if (node == null) {
-            return false;
-        }
-        if (node.isString()) {
-            return containsImageUrl(node.stringValue(), imageUrl);
-        }
-        if (node.isObject()) {
-            for (var property : node.properties()) {
-                if (containsImageUrl(property.getKey(), imageUrl)) {
-                    return true;
-                }
-            }
-        }
-        for (JsonNode child : node.values()) {
-            if (referencesImage(child, imageUrl)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean containsImageUrl(String text, String imageUrl) {
-        var matcher = ENTITY.matcher(text);
-        StringBuffer markdown = new StringBuffer();
-        while (matcher.find()) {
-            matcher.appendReplacement(markdown, java.util.regex.Matcher.quoteReplacement(
-                    Parser.unescapeEntities(matcher.group(), false)));
-        }
-        matcher.appendTail(markdown);
-        if (containsNormalized(markdown.toString(), imageUrl)) return true;
-
-        // HTML 속성에서는 세미콜론 없는 문자 참조도 브라우저 규칙에 따라 처리한다.
-        var tags = HTML_TAG.matcher(text);
-        while (tags.find()) {
-            if (containsNormalized(Parser.unescapeEntities(tags.group(), true), imageUrl)) return true;
-        }
-        return false;
-    }
-
-    private static boolean containsNormalized(String text, String imageUrl) {
-        StringBuilder normalized = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
-            char current = text.charAt(i);
-            if (current == '\\' && i + 1 < text.length() && isAsciiPunctuation(text.charAt(i + 1))) {
-                current = text.charAt(++i);
-            }
-            normalized.append(current);
-        }
-        return decodeUnreserved(normalized.toString()).contains(decodeUnreserved(imageUrl));
-    }
-
-    private static String decodeUnreserved(String value) {
-        StringBuilder result = new StringBuilder(value.length());
-        for (int i = 0; i < value.length(); i++) {
-            if (value.charAt(i) == '%' && i + 2 < value.length()) {
-                int high = Character.digit(value.charAt(i + 1), 16);
-                int low = Character.digit(value.charAt(i + 2), 16);
-                int c = high < 0 || low < 0 ? -1 : (high << 4) + low;
-                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
-                        || c == '-' || c == '.' || c == '_' || c == '~') {
-                    result.append((char) c);
-                    i += 2;
-                    continue;
-                }
-            }
-            result.append(value.charAt(i));
-        }
-        return result.toString();
-    }
-
-    private static boolean isAsciiPunctuation(char c) {
-        return (c >= '!' && c <= '/') || (c >= ':' && c <= '@')
-                || (c >= '[' && c <= '`') || (c >= '{' && c <= '~');
-    }
 }
