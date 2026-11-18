@@ -168,6 +168,57 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void unclosedHtmlCommentPreservesPotentialImageReference() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        service.updatePost(postId, request("<!-- unclosed <img src=\"https://example.com/old&#46png\">"), userId);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
+    void unclosedHtmlCommentBlocksPotentialImageDeletion() {
+        String content = "<!-- unclosed <img src=\"https://example.com/old&#46png\">";
+        assertError(() -> service.updatePost(postId, deletionRequest(content, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+    }
+
+    @Test
+    void manyHtmlAttributesPreserveReferencedImage() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        StringBuilder html = new StringBuilder("<img ");
+        for (int i = 0; i < 520; i++) html.append("a").append(i).append("=x ");
+        html.append("src=\"https://example.com/old&#46png\">");
+        service.updatePost(postId, request(html.toString()), userId);
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
+    void manyHtmlAttributesBlockDeletionWhenImageReferenceIsLast() {
+        StringBuilder html = new StringBuilder("<img ");
+        for (int i = 0; i < 520; i++) html.append("a").append(i).append("=x ");
+        html.append("src=\"https://example.com/old&#46png\">");
+        assertError(() -> service.updatePost(postId, deletionRequest(html.toString(), imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+    }
+
+    @Test
+    void htmlWithoutImageReferenceStillAllowsDeletion() {
+        service.updatePost(postId, deletionRequest("<p>내용</p>", imageId), userId);
+        assertThat(images.findById(imageId)).isEmpty();
+    }
+
+    @Test
+    void manyHtmlAttributesBlockDeletionWhenImageReferenceIsFirst() {
+        StringBuilder html = new StringBuilder("<img src=\"https://example.com/old&#46png\" ");
+        for (int i = 0; i < 520; i++) html.append("a").append(i).append("=x ");
+        html.append(">");
+        assertError(() -> service.updatePost(postId, deletionRequest(html.toString(), imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+    }
+
+    @Test
     void htmlAttributeWithQuotedGreaterThanPreservesReferencedImage() {
         service.replacePostImage(postId, imageId, file(), userId);
         String html = "<img alt=\"a > b\" src=\"https://example.com/old&#46png\">";

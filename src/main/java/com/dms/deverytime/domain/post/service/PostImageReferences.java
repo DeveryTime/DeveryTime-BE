@@ -1,6 +1,5 @@
 package com.dms.deverytime.domain.post.service;
 
-import org.jsoup.Jsoup;
 import org.jsoup.parser.Parser;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -51,10 +50,10 @@ final class PostImageReferences {
         matcher.appendTail(decoded);
         texts.add(normalize(decoded.toString()));
 
-        // HTML 속성의 문자 참조는 HTML 파서 규칙으로 해석한다.
+        // HTML 가능성이 있으면 원문도 보수적으로 검사한다. 주석이나 속성 수 제한으로
+        // 파서가 주소를 놓쳐 파일을 삭제하는 것보다 불필요한 보존이 안전하다.
         if (text.indexOf('<') >= 0) {
-            Jsoup.parseBodyFragment(text).getAllElements().forEach(element ->
-                    element.attributes().forEach(attribute -> texts.add(normalize(attribute.getValue()))));
+            texts.add(normalize(Parser.unescapeEntities(text, false)));
         }
     }
 
