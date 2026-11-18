@@ -40,7 +40,8 @@ class PostDraftAccessTest {
         when(posts.findById(10L)).thenReturn(Optional.of(post));
         when(images.findByPostIdOrderBySortOrder(10L)).thenReturn(List.of());
         service = new PostService(posts, users, mock(CategoryRepository.class), images, views, likes,
-                mock(ImageStorageService.class), mock(CommentRepository.class));
+                mock(ImageStorageService.class), mock(CommentRepository.class),
+                mock(PostImageCleanupRepository.class), mock(PostImageCleanupService.class));
     }
 
     @Test

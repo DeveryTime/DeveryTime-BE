@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -21,6 +22,24 @@ public class ImageStorageService {
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
     private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+    public String newPostImagePublicId() {
+        return "posts/" + UUID.randomUUID();
+    }
+
+    public ImageUploadResult uploadReservedPostImage(MultipartFile file, String publicId) {
+        validateImage(file);
+        try {
+            Map result = cloudinary.uploader().upload(file.getBytes(),
+                    ObjectUtils.asMap("public_id", publicId, "overwrite", false));
+            if (!publicId.equals(result.get("public_id"))) {
+                throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
+            }
+            return ImageUploadResult.of(result.get("secure_url").toString(), publicId);
+        } catch (IOException | RuntimeException e) {
+            throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
 
     public ImageUploadResult upload(MultipartFile file, String folder){
 
@@ -40,9 +59,21 @@ public class ImageStorageService {
                 uploadResult.get("public_id").toString());
     }
 
-    public void delete(String publicId){
+    public void delete(String publicId) {
+        deleteIfPresent(publicId);
+    }
+
+    // 업로드 결과가 불확실할 때 not found는 아직 업로드 중일 가능성이 있다.
+    public boolean deleteUploadCandidate(String publicId) {
+        return deleteIfPresent(publicId);
+    }
+
+    private boolean deleteIfPresent(String publicId) {
         try {
-            cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
+            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.asMap("invalidate", true));
+            if ("ok".equals(result.get("result"))) return true;
+            if ("not found".equals(result.get("result"))) return false;
+            throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         } catch (IOException | RuntimeException e) {
             throw new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED);
         }
