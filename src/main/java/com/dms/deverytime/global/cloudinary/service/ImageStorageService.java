@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +20,24 @@ public class ImageStorageService {
     private final Cloudinary cloudinary;
     private final Tika tika = new Tika();
     private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+    public String newPostImagePublicId() {
+        return "posts/" + UUID.randomUUID();
+    }
+
+    public ImageUploadResult uploadReservedPostImage(MultipartFile file, String publicId) {
+        validateImage(file);
+        try {
+            Map result = cloudinary.uploader().upload(file.getBytes(),
+                    ObjectUtils.asMap("public_id", publicId, "overwrite", false));
+            if (!publicId.equals(result.get("public_id"))) {
+                throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
+            }
+            return ImageUploadResult.of(result.get("secure_url").toString(), publicId);
+        } catch (IOException | RuntimeException e) {
+            throw new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
 
     public ImageUploadResult upload(MultipartFile file, String folder){
 

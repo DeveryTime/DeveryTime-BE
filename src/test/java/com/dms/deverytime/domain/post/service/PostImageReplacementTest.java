@@ -75,12 +75,14 @@ class PostImageReplacementTest {
             userId = user.getId();
             imageId = image.getId();
         });
-        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
+        when(storage.newPostImagePublicId()).thenReturn("new-file");
+        when(storage.uploadReservedPostImage(any(), anyString())).thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
     }
 
     @Test
     void committedUploadCandidateCannotDeleteImageStillReferencedAfterReplacement() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("preserved-image-a", "replacement-image-b");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of(NEW_URL, "preserved-image-a"))
                 .thenReturn(ImageUploadResult.of("https://example.com/next.png", "replacement-image-b"));
 
@@ -89,12 +91,27 @@ class PostImageReplacementTest {
             assertThat(pending.findAll()).filteredOn(record -> record.getPublicId().equals("preserved-image-a"))
                     .singleElement().satisfies(record -> assertThat(record.isCompleted()).isTrue());
         });
+        transaction.executeWithoutResult(status ->
+                assertThat(pending.findAll()).filteredOn(record -> record.getPublicId().equals("preserved-image-a"))
+                        .singleElement().satisfies(record -> assertThat(record.isCompleted()).isTrue()));
         service.updatePost(postId, request(body(NEW_URL)), userId);
         service.replacePostImage(postId, imageId, file(), userId);
         cleanupService.cleanupAfterContentSaved(postId);
 
         assertThat(savedContent()).isEqualTo(body(NEW_URL));
         verify(storage, never()).delete("preserved-image-a");
+    }
+
+    @Test
+    void replacementPreservesUnsavedEditorImageUntilContentIsSaved() {
+        service.updatePost(postId, request("text only"), userId);
+        service.replacePostImage(postId, imageId, file(), userId);
+
+        verify(storage, never()).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+        service.updatePost(postId, request(body(NEW_URL)), userId);
+        verify(storage).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
     }
 
     @Test
@@ -226,7 +243,7 @@ class PostImageReplacementTest {
         assertError(() -> service.replacePostImage(-1L, imageId, file(), userId), ErrorCode.POST_NOT_FOUND);
         assertError(() -> service.replacePostImage(postId, imageId, file(), -1L), ErrorCode.FORBIDDEN);
         assertError(() -> service.replacePostImage(postId, -1L, file(), userId), ErrorCode.POST_IMAGE_NOT_FOUND);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
     }
 
     @Test
@@ -240,23 +257,25 @@ class PostImageReplacementTest {
         });
         assertError(() -> service.replacePostImage(anotherPostId, imageId, file(), userId),
                 ErrorCode.POST_IMAGE_NOT_FOUND);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
     }
 
     @Test
     void invalidFileAndUploadFailureKeepOldImage() {
+        when(storage.newPostImagePublicId()).thenReturn("failed-upload-replacement-unique");
         doThrow(new DeveryTimeException(ErrorCode.INVALID_IMAGE_FILE)).when(storage).validateImage(null);
         assertError(() -> service.replacePostImage(postId, imageId, null, userId), ErrorCode.INVALID_IMAGE_FILE);
-        when(storage.upload(any(), eq("posts"))).thenThrow(new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED));
+        when(storage.uploadReservedPostImage(any(), anyString())).thenThrow(new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED));
         assertError(() -> service.replacePostImage(postId, imageId, file(), userId), ErrorCode.IMAGE_UPLOAD_FAILED);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
         assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
-        verify(storage, never()).delete(anyString());
+        verify(storage).delete("failed-upload-replacement-unique");
     }
 
     @Test
     void databaseFailureCleansNewFileAndKeepsOldImage() {
-        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of("x".repeat(501), "failed-insert-file"));
+        when(storage.newPostImagePublicId()).thenReturn("failed-insert-file");
+        when(storage.uploadReservedPostImage(any(), anyString())).thenReturn(ImageUploadResult.of("x".repeat(501), "failed-insert-file"));
         assertThatThrownBy(() -> service.replacePostImage(postId, imageId, file(), userId))
                 .isInstanceOf(RuntimeException.class);
         assertThat(images.findById(imageId).orElseThrow().getImageUrl()).isEqualTo(OLD_URL);
@@ -267,7 +286,8 @@ class PostImageReplacementTest {
 
     @Test
     void commitFailureRollsBackReplacementAndPendingRecord() {
-        when(storage.upload(any(), eq("posts"))).thenReturn(ImageUploadResult.of(NEW_URL, "failed-commit-file"));
+        when(storage.newPostImagePublicId()).thenReturn("failed-commit-file");
+        when(storage.uploadReservedPostImage(any(), anyString())).thenReturn(ImageUploadResult.of(NEW_URL, "failed-commit-file"));
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             service.replacePostImage(postId, imageId, file(), userId);
             failBeforeCommit();
@@ -314,7 +334,8 @@ class PostImageReplacementTest {
 
     @Test
     void repeatedReplacementsWithoutImageUrlsCleanAllPreviousFiles() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("middle-file", "new-file");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("https://example.com/middle", "middle-file"))
                 .thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
         service.replacePostImage(postId, imageId, file(), userId);
@@ -384,7 +405,8 @@ class PostImageReplacementTest {
 
     @Test
     void repeatedReplacementsKeepAllOldFilesUntilLatestUrlIsSaved() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("middle-file", "new-file");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("https://example.com/middle", "middle-file"))
                 .thenReturn(ImageUploadResult.of(NEW_URL, "new-file"));
         service.replacePostImage(postId, imageId, file(), userId);

@@ -268,17 +268,15 @@ public class PostService {
                 .mapToInt(PostImage::getSortOrder)
                 .max()
                 .orElse(-1) + 1;
-        List<String> uploadedPublicIds = new ArrayList<>();
         List<Long> cleanupIds = new ArrayList<>();
-        registerUploadRollbackCleanup(postId, uploadedPublicIds, cleanupIds);
+        registerUploadRollbackCleanup(postId, cleanupIds);
 
         List<PostImageResponse> responses = new ArrayList<>();
         for (MultipartFile file : files) {
-            ImageUploadResult result = imageStorageService.upload(file, "posts");
-            uploadedPublicIds.add(result.profileImagePublicId());
-            Long cleanupId = postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId());
+            String publicId = imageStorageService.newPostImagePublicId();
+            Long cleanupId = postImageCleanupService.recordUploadedFile(postId, publicId);
             cleanupIds.add(cleanupId);
-            uploadedPublicIds.remove(result.profileImagePublicId());
+            ImageUploadResult result = imageStorageService.uploadReservedPostImage(file, publicId);
             PostImage image = postImageRepository.save(new PostImage(
                     post, result.profileImageUrl(), result.profileImagePublicId(), nextOrder++));
             // 별도 트랜잭션에서 만든 기록을 현재 트랜잭션에서 읽고 함께 확정한다.
@@ -298,15 +296,14 @@ public class PostService {
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_IMAGE_NOT_FOUND));
         imageStorageService.validateImage(file);
 
-        List<String> uploadedPublicIds = new ArrayList<>();
         List<Long> cleanupIds = new ArrayList<>();
-        registerUploadRollbackCleanup(postId, uploadedPublicIds, cleanupIds);
-        ImageUploadResult result = imageStorageService.upload(file, "posts");
-        uploadedPublicIds.add(result.profileImagePublicId());
-        Long cleanupId = postImageCleanupService.recordUploadedFile(postId, result.profileImagePublicId());
+        registerUploadRollbackCleanup(postId, cleanupIds);
+        String publicId = imageStorageService.newPostImagePublicId();
+        Long cleanupId = postImageCleanupService.recordUploadedFile(postId, publicId);
         cleanupIds.add(cleanupId);
-        uploadedPublicIds.remove(result.profileImagePublicId());
+        ImageUploadResult result = imageStorageService.uploadReservedPostImage(file, publicId);
 
+        // 편집 중인 클라이언트가 이전 URL을 아직 사용할 수 있으므로 본문 저장 전에는 보존한다.
         postImageCleanupRepository.save(new PostImageCleanup(postId, image));
         image.replaceFile(result.profileImageUrl(), result.profileImagePublicId());
         postImageCleanupRepository.findByIdForUpdate(cleanupId).orElseThrow().complete();
@@ -327,14 +324,14 @@ public class PostService {
         });
     }
 
-    private void registerUploadRollbackCleanup(Long postId, List<String> uploadedPublicIds, List<Long> cleanupIds) {
+    private void registerUploadRollbackCleanup(Long postId, List<Long> cleanupIds) {
         // 메서드 내부 예외뿐 아니라 트랜잭션 커밋 실패에 의한 롤백도 처리한다.
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
                 if (status == STATUS_UNKNOWN) {
                     log.error("Image upload transaction outcome unknown; cleanup requires verification: {}",
-                            uploadedPublicIds);
+                            cleanupIds);
                 }
                 if (status == STATUS_ROLLED_BACK) {
                     for (Long cleanupId : cleanupIds) {
@@ -342,13 +339,6 @@ public class PostService {
                             postImageCleanupService.cleanupRolledBackUpload(cleanupId);
                         } catch (RuntimeException cleanupFailure) {
                             log.error("Rolled-back image cleanup retained for retry: {}", cleanupId, cleanupFailure);
-                        }
-                    }
-                    for (String publicId : uploadedPublicIds) {
-                        try {
-                            imageStorageService.delete(publicId);
-                        } catch (RuntimeException cleanupFailure) {
-                            log.error("Failed to clean up unrecorded post image: {}", publicId, cleanupFailure);
                         }
                     }
                 }

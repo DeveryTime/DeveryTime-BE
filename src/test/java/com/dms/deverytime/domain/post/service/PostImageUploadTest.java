@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
@@ -86,11 +87,78 @@ class PostImageUploadTest {
             postId = post.getId();
             userId = user.getId();
         });
+        AtomicInteger ids = new AtomicInteger();
+        when(storage.newPostImagePublicId()).thenAnswer(invocation -> "public-" + ids.incrementAndGet());
         AtomicInteger uploads = new AtomicInteger();
-        when(storage.upload(any(), eq("posts"))).thenAnswer(invocation -> {
+        when(storage.uploadReservedPostImage(any(), anyString())).thenAnswer(invocation -> {
             int n = uploads.incrementAndGet();
             return ImageUploadResult.of("https://example.com/" + n, "public-" + n);
         });
+    }
+
+    @Test
+    void cleanupRecordIsCommittedBeforeExternalUploadStarts() {
+        when(storage.newPostImagePublicId()).thenReturn("reserved-before-upload");
+        TransactionTemplate independentRead = new TransactionTemplate(transactionManager);
+        independentRead.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        when(storage.uploadReservedPostImage(any(), eq("reserved-before-upload"))).thenAnswer(invocation -> {
+            independentRead.executeWithoutResult(status ->
+                    assertThat(pending.findByPostIdOrderById(postId))
+                            .singleElement().satisfies(record -> {
+                                assertThat(record.getPublicId()).isEqualTo("reserved-before-upload");
+                                assertThat(record.isCompleted()).isFalse();
+                            }));
+            return ImageUploadResult.of("https://example.com/reserved", "reserved-before-upload");
+        });
+
+        service.uploadPostImages(postId, List.of(file()), userId);
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void retryCleansReservedFileAfterInterruptedUpload() {
+        cleanupService.recordUploadedFile(postId, "reserved-interrupted-upload");
+
+        PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
+        when(retryQueue.findPostIdsWithRetryableCleanup()).thenReturn(List.of(postId));
+        new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
+
+        verify(storage).delete("reserved-interrupted-upload");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void retryDoesNotDeleteAnUploadInProgress() throws Exception {
+        CountDownLatch uploading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch retryStarted = new CountDownLatch(1);
+        when(storage.newPostImagePublicId()).thenReturn("active-upload-unique");
+        when(storage.uploadReservedPostImage(any(), eq("active-upload-unique"))).thenAnswer(invocation -> {
+            uploading.countDown();
+            if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("upload gate timed out");
+            return ImageUploadResult.of("https://example.com/active", "active-upload-unique");
+        });
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var upload = executor.submit(() -> service.uploadPostImages(postId, List.of(file()), userId));
+            assertThat(uploading.await(5, TimeUnit.SECONDS)).isTrue();
+            var retry = executor.submit(() -> {
+                retryStarted.countDown();
+                cleanupService.cleanupAfterContentSaved(postId);
+            });
+            assertThat(retryStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThatThrownBy(() -> retry.get(250, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+            release.countDown();
+            assertThat(upload.get(5, TimeUnit.SECONDS)).hasSize(1);
+            retry.get(5, TimeUnit.SECONDS);
+            verify(storage, never()).delete("active-upload-unique");
+            assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
     }
 
     @Test
@@ -119,7 +187,7 @@ class PostImageUploadTest {
         seedImage(1);
         assertError(() -> service.uploadPostImages(postId, List.of(file(), file()), userId),
                 ErrorCode.POST_IMAGE_LIMIT_EXCEEDED);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
         assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(2);
     }
 
@@ -127,7 +195,7 @@ class PostImageUploadTest {
     void rejectsMissingOrEmptyFiles() {
         assertError(() -> service.uploadPostImages(postId, null, userId), ErrorCode.INVALID_IMAGE_FILE);
         assertError(() -> service.uploadPostImages(postId, List.of(), userId), ErrorCode.INVALID_IMAGE_FILE);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
     }
 
     @Test
@@ -136,19 +204,20 @@ class PostImageUploadTest {
         doThrow(new DeveryTimeException(ErrorCode.INVALID_IMAGE_FILE)).when(storage).validateImage(invalid);
         assertError(() -> service.uploadPostImages(postId, List.of(file(), invalid), userId),
                 ErrorCode.INVALID_IMAGE_FILE);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
     }
 
     @Test
     void rejectsUnknownPostAndNonOwner() {
         assertError(() -> service.uploadPostImages(-1L, List.of(file()), userId), ErrorCode.POST_NOT_FOUND);
         assertError(() -> service.uploadPostImages(postId, List.of(file()), -1L), ErrorCode.FORBIDDEN);
-        verify(storage, never()).upload(any(), anyString());
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
     }
 
     @Test
     void secondUploadFailureRollsBackRowsAndDeletesFirstFile() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("first", "failed-second");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("https://example.com/first", "first"))
                 .thenThrow(new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED));
         assertError(() -> service.uploadPostImages(postId, List.of(file(), file()), userId),
@@ -159,7 +228,8 @@ class PostImageUploadTest {
 
     @Test
     void databaseInsertFailureDeletesUploadedFile() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("too-long-url");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("x".repeat(501), "too-long-url"));
         assertThatThrownBy(() -> service.uploadPostImages(postId, List.of(file()), userId))
                 .isInstanceOf(RuntimeException.class);
@@ -169,7 +239,8 @@ class PostImageUploadTest {
 
     @Test
     void commitPhaseFailureAlsoCleansUploadedFilesAndContinuesAfterCleanupFailure() {
-        when(storage.upload(any(), eq("posts")))
+        when(storage.newPostImagePublicId()).thenReturn("failed-upload-1", "failed-upload-2");
+        when(storage.uploadReservedPostImage(any(), anyString()))
                 .thenReturn(ImageUploadResult.of("https://example.com/failed1", "failed-upload-1"))
                 .thenReturn(ImageUploadResult.of("https://example.com/failed2", "failed-upload-2"));
         doThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).doNothing().when(storage).delete("failed-upload-1");
@@ -206,12 +277,13 @@ class PostImageUploadTest {
 
     @Test
     void concurrentUploadsCannotExceedThreeImages() throws Exception {
+        when(storage.newPostImagePublicId()).thenReturn("new");
         seedImage(0);
         seedImage(1);
         CountDownLatch firstUploadStarted = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
         CountDownLatch secondRequestStarted = new CountDownLatch(1);
-        when(storage.upload(any(), eq("posts"))).thenAnswer(invocation -> {
+        when(storage.uploadReservedPostImage(any(), anyString())).thenAnswer(invocation -> {
             firstUploadStarted.countDown();
             if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("upload gate timed out");
@@ -236,7 +308,7 @@ class PostImageUploadTest {
             assertThat(first.get(5, TimeUnit.SECONDS)).hasSize(1);
             assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(ErrorCode.POST_IMAGE_LIMIT_EXCEEDED);
             assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
-            verify(storage, times(1)).upload(any(), eq("posts"));
+            verify(storage, times(1)).uploadReservedPostImage(any(), anyString());
         } finally {
             releaseFirst.countDown();
             executor.shutdownNow();
