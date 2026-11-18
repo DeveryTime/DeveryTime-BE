@@ -77,7 +77,7 @@ public class PostImageCleanupService {
             return false;
         }
         // 유효한 JSON이어도 객체 키에 사진 URL이 포함될 수 있다.
-        if (HtmlUtils.htmlUnescape(content).replace("\\/", "/").contains(imageUrl)) {
+        if (containsImageUrl(content, imageUrl)) {
             return true;
         }
         try {
@@ -97,11 +97,11 @@ public class PostImageCleanupService {
             return false;
         }
         if (node.isString()) {
-            return HtmlUtils.htmlUnescape(node.stringValue()).contains(imageUrl);
+            return containsImageUrl(node.stringValue(), imageUrl);
         }
         if (node.isObject()) {
             for (var property : node.properties()) {
-                if (HtmlUtils.htmlUnescape(property.getKey()).contains(imageUrl)) {
+                if (containsImageUrl(property.getKey(), imageUrl)) {
                     return true;
                 }
             }
@@ -112,5 +112,27 @@ public class PostImageCleanupService {
             }
         }
         return false;
+    }
+
+    private static boolean containsImageUrl(String text, String imageUrl) {
+        String unescaped = HtmlUtils.htmlUnescape(text);
+        if (unescaped.contains(imageUrl)) {
+            return true;
+        }
+        // CommonMark에서는 ASCII 문장부호 앞의 백슬래시를 제거한다.
+        StringBuilder normalized = new StringBuilder(unescaped.length());
+        for (int i = 0; i < unescaped.length(); i++) {
+            char current = unescaped.charAt(i);
+            if (current == '\\' && i + 1 < unescaped.length() && isAsciiPunctuation(unescaped.charAt(i + 1))) {
+                current = unescaped.charAt(++i);
+            }
+            normalized.append(current);
+        }
+        return normalized.toString().contains(imageUrl);
+    }
+
+    private static boolean isAsciiPunctuation(char c) {
+        return (c >= '!' && c <= '/') || (c >= ':' && c <= '@')
+                || (c >= '[' && c <= '`') || (c >= '{' && c <= '~');
     }
 }

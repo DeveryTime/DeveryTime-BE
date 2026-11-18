@@ -127,6 +127,28 @@ class PostImageReplacementTest {
     }
 
     @Test
+    void markdownEscapedImageReferencePreservesReplacedFile() {
+        service.replacePostImage(postId, imageId, file(), userId);
+        String content = "![사진](https://example.com/old\\.png)";
+
+        service.updatePost(postId, request(content), userId);
+
+        assertThat(savedContent()).isEqualTo(content);
+        verify(storage, never()).delete("old-file");
+        assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
+    }
+
+    @Test
+    void markdownEscapedImageReferenceBlocksExplicitDeletion() {
+        String content = "![사진](https://example.com/old\\.png)";
+
+        assertError(() -> service.updatePost(postId, deletionRequest(content, imageId), userId),
+                ErrorCode.VALIDATION_ERROR);
+        assertThat(images.findById(imageId)).isPresent();
+        verify(storage, never()).delete("old-file");
+    }
+
+    @Test
     void oldBodyCannotRestoreDeletedPhotoUrlWithEscapedJson() {
         service.updatePost(postId, deletionRequest("text only", imageId), userId);
         String oldJson = "{\"images\":[\"https:\\/\\/example.com\\/old.png\"]}";

@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
@@ -62,6 +61,7 @@ class PostImageUploadTest {
     @Autowired ImageStorageService storage;
     @Autowired EntityManagerFactory entityManagerFactory;
     @Autowired PlatformTransactionManager transactionManager;
+    @Autowired DataSource dataSource;
 
     private TransactionTemplate transaction;
     private EntityManager em;
@@ -135,7 +135,7 @@ class PostImageUploadTest {
         when(storage.newPostImagePublicId()).thenReturn("active-upload-unique");
         when(storage.uploadReservedPostImage(any(), eq("active-upload-unique"))).thenAnswer(invocation -> {
             uploading.countDown();
-            if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("upload gate timed out");
+            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("upload gate timed out");
             return ImageUploadResult.of("https://example.com/active", "active-upload-unique");
         });
         var executor = Executors.newFixedThreadPool(2);
@@ -147,8 +147,7 @@ class PostImageUploadTest {
                 cleanupService.cleanupAfterContentSaved(postId);
             });
             assertThat(retryStarted.await(5, TimeUnit.SECONDS)).isTrue();
-            assertThatThrownBy(() -> retry.get(250, TimeUnit.MILLISECONDS))
-                    .isInstanceOf(TimeoutException.class);
+            assertThat(waitForPostRowLock()).as("cleanup must wait for the post row lock").isTrue();
             release.countDown();
             assertThat(upload.get(5, TimeUnit.SECONDS)).hasSize(1);
             retry.get(5, TimeUnit.SECONDS);
@@ -159,6 +158,26 @@ class PostImageUploadTest {
             executor.shutdownNow();
             executor.awaitTermination(5, TimeUnit.SECONDS);
         }
+    }
+
+    private boolean waitForPostRowLock() throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            while (System.nanoTime() < deadline) {
+                try (var rows = statement.executeQuery("SELECT EXECUTING_STATEMENT FROM INFORMATION_SCHEMA.SESSIONS "
+                        + "WHERE BLOCKER_ID IS NOT NULL")) {
+                    while (rows.next()) {
+                        String sql = rows.getString(1);
+                        if (sql != null && sql.toUpperCase(java.util.Locale.ROOT).contains("FOR UPDATE")
+                                && sql.toUpperCase(java.util.Locale.ROOT).contains("POST")) {
+                            return true;
+                        }
+                    }
+                }
+                Thread.sleep(10);
+            }
+        }
+        return false;
     }
 
     @Test
