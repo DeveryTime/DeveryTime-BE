@@ -72,13 +72,18 @@ public class PostController {
     }
 
     // 게시글 이미지 업로드 — 기존 이미지를 포함해 최대 3장
+    // files: 여러 장(응답은 목록), file: 구 클라이언트 호환용 1장(응답은 단일 객체)
     @PostMapping(value = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<List<PostImageResponse>> uploadPostImages(
+    public ApiResponse<?> uploadPostImages(
             @PathVariable("id") Long id,
             @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            @RequestPart(value = "file", required = false) MultipartFile file,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         Long loginUserId = userDetails.getUserId();
+        if ((files == null || files.isEmpty()) && file != null) {
+            return ApiResponse.success(postService.uploadPostImages(id, List.of(file), loginUserId).get(0));
+        }
         return ApiResponse.success(postService.uploadPostImages(id, files, loginUserId));
     }
 
