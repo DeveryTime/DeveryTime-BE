@@ -19,7 +19,8 @@ public class CloudinaryConfig {
                         "cloud_name", cloudinaryProperties.cloudName(),
                         "api_key", cloudinaryProperties.apiKey(),
                         "api_secret", cloudinaryProperties.apiSecret(),
-                        "secure", true
+                        "secure", true,
+                        "timeout", 30
                 )
         );
     }

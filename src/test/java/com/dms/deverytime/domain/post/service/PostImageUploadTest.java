@@ -1,0 +1,457 @@
+package com.dms.deverytime.domain.post.service;
+
+import com.dms.deverytime.domain.category.entity.Category;
+import com.dms.deverytime.domain.category.repository.CategoryRepository;
+import com.dms.deverytime.domain.comment.repository.CommentRepository;
+import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
+import com.dms.deverytime.domain.post.entity.Post;
+import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.entity.PostImage;
+import com.dms.deverytime.domain.post.repository.PostImageRepository;
+import com.dms.deverytime.domain.post.repository.PostImageCleanupRepository;
+import com.dms.deverytime.domain.post.repository.PostRepository;
+import com.dms.deverytime.domain.post.repository.PostViewLogRepository;
+import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
+import com.dms.deverytime.domain.user.entity.User;
+import com.dms.deverytime.domain.user.repository.UserRepository;
+import com.dms.deverytime.global.cloudinary.dto.ImageUploadResult;
+import com.dms.deverytime.global.cloudinary.service.ImageStorageService;
+import com.dms.deverytime.global.exception.DeveryTimeException;
+import com.dms.deverytime.global.exception.ErrorCode;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.orm.jpa.SharedEntityManagerCreator;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import javax.sql.DataSource;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+// 운영 DB/Cloudinary에 접근하지 않고 실제 JPA 트랜잭션과 잠금을 검증한다.
+@SpringJUnitConfig(PostImageUploadTest.Config.class)
+class PostImageUploadTest {
+    @Autowired PostService service;
+    @Autowired PostImageRepository images;
+    @Autowired PostImageCleanupRepository pending;
+    @Autowired PostImageCleanupService cleanupService;
+    @Autowired ImageStorageService storage;
+    @Autowired EntityManagerFactory entityManagerFactory;
+    @Autowired PlatformTransactionManager transactionManager;
+    @Autowired DataSource dataSource;
+    @Autowired TestClock clock;
+
+    private TransactionTemplate transaction;
+    private EntityManager em;
+    private Long postId;
+    private Long userId;
+    private static final AtomicInteger sequence = new AtomicInteger();
+
+    @BeforeEach
+    void setUp() {
+        reset(storage);
+        when(storage.deleteUploadCandidate(anyString())).thenReturn(true);
+        transaction = new TransactionTemplate(transactionManager);
+        em = SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory);
+        transaction.executeWithoutResult(status -> {
+            int n = sequence.incrementAndGet();
+            User user = User.builder().schoolYear(2026).schoolNumber(String.valueOf(n))
+                    .name("tester").email("user" + n + "@example.com")
+                    .username("user" + n).passwordHash("test").build();
+            Category category = new Category("category" + n);
+            em.persist(user);
+            em.persist(category);
+            Post post = new Post(user, category, "title", "content", PostCreateStatus.PUBLISHED);
+            em.persist(post);
+            postId = post.getId();
+            userId = user.getId();
+        });
+        AtomicInteger ids = new AtomicInteger();
+        when(storage.newPostImagePublicId()).thenAnswer(invocation -> "public-" + ids.incrementAndGet());
+        AtomicInteger uploads = new AtomicInteger();
+        when(storage.uploadReservedPostImage(any(), anyString())).thenAnswer(invocation -> {
+            int n = uploads.incrementAndGet();
+            return ImageUploadResult.of("https://example.com/" + n, "public-" + n);
+        });
+    }
+
+    @Test
+    void cleanupRecordIsCommittedBeforeExternalUploadStarts() {
+        when(storage.newPostImagePublicId()).thenReturn("reserved-before-upload");
+        TransactionTemplate independentRead = new TransactionTemplate(transactionManager);
+        independentRead.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        when(storage.uploadReservedPostImage(any(), eq("reserved-before-upload"))).thenAnswer(invocation -> {
+            independentRead.executeWithoutResult(status ->
+                    assertThat(pending.findByPostIdOrderById(postId))
+                            .singleElement().satisfies(record -> {
+                                assertThat(record.getPublicId()).isEqualTo("reserved-before-upload");
+                                assertThat(record.isCompleted()).isFalse();
+                            }));
+            return ImageUploadResult.of("https://example.com/reserved", "reserved-before-upload");
+        });
+
+        service.uploadPostImages(postId, List.of(file()), userId);
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void retryCleansReservedFileAfterInterruptedUpload() {
+        cleanupService.recordUploadedFile(postId, "reserved-interrupted-upload");
+
+        PostImageCleanupRepository retryQueue = mock(PostImageCleanupRepository.class);
+        when(retryQueue.findPostIdsWithRetryableCleanup(any())).thenReturn(List.of(postId));
+        new PostImageCleanupRetry(retryQueue, cleanupService).retryPendingCleanup();
+
+        verify(storage).deleteUploadCandidate("reserved-interrupted-upload");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void missingDelayedUploadRemainsPendingUntilItAppears() {
+        Long id = cleanupService.recordUploadedFile(postId, "delayed-upload");
+        when(storage.deleteUploadCandidate("delayed-upload")).thenReturn(false, true);
+
+        cleanupService.cleanupAfterContentSaved(postId);
+        assertThat(pending.findById(id)).get().satisfies(record -> {
+            assertThat(record.isCompleted()).isFalse();
+            assertThat(record.getNextRetryAt()).isAfter(java.time.LocalDateTime.now());
+        });
+        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).doesNotContain(postId);
+        cleanupService.cleanupAfterContentSaved(postId);
+        verify(storage, times(1)).deleteUploadCandidate("delayed-upload");
+
+        transaction.executeWithoutResult(status -> pending.findById(id).orElseThrow()
+                .deferRetry(java.time.LocalDateTime.now().minusSeconds(1)));
+        assertThat(pending.findPostIdsWithRetryableCleanup(java.time.LocalDateTime.now())).contains(postId);
+        cleanupService.cleanupAfterContentSaved(postId);
+        assertThat(pending.findById(id)).get().satisfies(record -> assertThat(record.isCompleted()).isTrue());
+        verify(storage, times(2)).deleteUploadCandidate("delayed-upload");
+    }
+
+    @Test
+    void missingUploadStopsRetryingAfterDeadline() {
+        var start = java.time.Instant.parse("2026-01-01T00:00:00Z");
+        clock.delegate = java.time.Clock.fixed(start, java.time.ZoneOffset.UTC);
+        try {
+            Long id = cleanupService.recordUploadedFile(postId, "never-uploaded");
+            when(storage.deleteUploadCandidate("never-uploaded")).thenReturn(false);
+            cleanupService.cleanupAfterContentSaved(postId);
+            var deadline = java.time.LocalDateTime.ofInstant(start.plus(java.time.Duration.ofDays(7)), java.time.ZoneOffset.UTC);
+            assertThat(pending.findById(id).orElseThrow().getRetryDeadline()).isEqualTo(deadline);
+            clock.delegate = java.time.Clock.fixed(start.plus(java.time.Duration.ofDays(1)), java.time.ZoneOffset.UTC);
+            cleanupService.cleanupAfterContentSaved(postId);
+            assertThat(pending.findById(id).orElseThrow().getRetryDeadline()).isEqualTo(deadline);
+            assertThat(pending.findById(id).orElseThrow().isCompleted()).isFalse();
+            clock.delegate = java.time.Clock.fixed(start.plus(java.time.Duration.ofDays(7)), java.time.ZoneOffset.UTC);
+            cleanupService.cleanupAfterContentSaved(postId);
+            assertThat(pending.findById(id).orElseThrow().isCompleted()).isTrue();
+        } finally {
+            clock.delegate = java.time.Clock.systemDefaultZone();
+        }
+    }
+
+    @Test
+    void retryDoesNotDeleteAnUploadInProgress() throws Exception {
+        CountDownLatch uploading = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch retryStarted = new CountDownLatch(1);
+        when(storage.newPostImagePublicId()).thenReturn("active-upload-unique");
+        when(storage.uploadReservedPostImage(any(), eq("active-upload-unique"))).thenAnswer(invocation -> {
+            uploading.countDown();
+            if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("upload gate timed out");
+            return ImageUploadResult.of("https://example.com/active", "active-upload-unique");
+        });
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var upload = executor.submit(() -> service.uploadPostImages(postId, List.of(file()), userId));
+            assertThat(uploading.await(5, TimeUnit.SECONDS)).isTrue();
+            var retry = executor.submit(() -> {
+                retryStarted.countDown();
+                cleanupService.cleanupAfterContentSaved(postId);
+            });
+            assertThat(retryStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(waitForPostRowLock()).as("cleanup must wait for the post row lock").isTrue();
+            release.countDown();
+            assertThat(upload.get(5, TimeUnit.SECONDS)).hasSize(1);
+            retry.get(5, TimeUnit.SECONDS);
+            verify(storage, never()).deleteUploadCandidate("active-upload-unique");
+            assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+    }
+
+    private boolean waitForPostRowLock() throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            while (System.nanoTime() < deadline) {
+                try (var rows = statement.executeQuery("SELECT EXECUTING_STATEMENT FROM INFORMATION_SCHEMA.SESSIONS "
+                        + "WHERE BLOCKER_ID IS NOT NULL")) {
+                    while (rows.next()) {
+                        String sql = rows.getString(1);
+                        if (sql != null && sql.toUpperCase(java.util.Locale.ROOT).contains("FOR UPDATE")
+                                && sql.toUpperCase(java.util.Locale.ROOT).contains("POST")) {
+                            return true;
+                        }
+                    }
+                }
+                Thread.sleep(10);
+            }
+        }
+        return false;
+    }
+
+    @Test
+    void uploadsThreeImagesInRequestOrderAndKeepsCommittedFiles() {
+        List<PostImageResponse> response = service.uploadPostImages(postId,
+                List.of(file(), file(), file()), userId);
+
+        assertThat(response).extracting(PostImageResponse::getSortOrder).containsExactly(0, 1, 2);
+        assertThat(response).extracting(PostImageResponse::getId).doesNotContainNull();
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
+        verify(storage, never()).delete(anyString());
+    }
+
+    @Test
+    void appendsAfterExistingMaximumOrder() {
+        seedImage(4);
+        seedImage(8);
+        assertThat(service.uploadPostImages(postId, List.of(file()), userId).get(0).getSortOrder())
+                .isEqualTo(9);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
+    }
+
+    @Test
+    void rejectsMoreThanThreeIncludingExistingImagesBeforeUploading() {
+        seedImage(0);
+        seedImage(1);
+        assertError(() -> service.uploadPostImages(postId, List.of(file(), file()), userId),
+                ErrorCode.POST_IMAGE_LIMIT_EXCEEDED);
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(2);
+    }
+
+    @Test
+    void rejectsMissingOrEmptyFiles() {
+        assertError(() -> service.uploadPostImages(postId, null, userId), ErrorCode.INVALID_IMAGE_FILE);
+        assertError(() -> service.uploadPostImages(postId, List.of(), userId), ErrorCode.INVALID_IMAGE_FILE);
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
+    }
+
+    @Test
+    void validatesEveryFileBeforeFirstUpload() {
+        MockMultipartFile invalid = file();
+        doThrow(new DeveryTimeException(ErrorCode.INVALID_IMAGE_FILE)).when(storage).validateImage(invalid);
+        assertError(() -> service.uploadPostImages(postId, List.of(file(), invalid), userId),
+                ErrorCode.INVALID_IMAGE_FILE);
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
+    }
+
+    @Test
+    void rejectsUnknownPostAndNonOwner() {
+        assertError(() -> service.uploadPostImages(-1L, List.of(file()), userId), ErrorCode.POST_NOT_FOUND);
+        assertError(() -> service.uploadPostImages(postId, List.of(file()), -1L), ErrorCode.FORBIDDEN);
+        verify(storage, never()).uploadReservedPostImage(any(), anyString());
+    }
+
+    @Test
+    void secondUploadFailureRollsBackRowsAndDeletesFirstFile() {
+        when(storage.newPostImagePublicId()).thenReturn("first", "failed-second");
+        when(storage.uploadReservedPostImage(any(), anyString()))
+                .thenReturn(ImageUploadResult.of("https://example.com/first", "first"))
+                .thenThrow(new DeveryTimeException(ErrorCode.IMAGE_UPLOAD_FAILED));
+        assertError(() -> service.uploadPostImages(postId, List.of(file(), file()), userId),
+                ErrorCode.IMAGE_UPLOAD_FAILED);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
+        verify(storage).deleteUploadCandidate("first");
+    }
+
+    @Test
+    void databaseInsertFailureDeletesUploadedFile() {
+        when(storage.newPostImagePublicId()).thenReturn("too-long-url");
+        when(storage.uploadReservedPostImage(any(), anyString()))
+                .thenReturn(ImageUploadResult.of("x".repeat(501), "too-long-url"));
+        assertThatThrownBy(() -> service.uploadPostImages(postId, List.of(file()), userId))
+                .isInstanceOf(RuntimeException.class);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
+        verify(storage).deleteUploadCandidate("too-long-url");
+    }
+
+    @Test
+    void commitPhaseFailureAlsoCleansUploadedFilesAndContinuesAfterCleanupFailure() {
+        when(storage.newPostImagePublicId()).thenReturn("failed-upload-1", "failed-upload-2");
+        when(storage.uploadReservedPostImage(any(), anyString()))
+                .thenReturn(ImageUploadResult.of("https://example.com/failed1", "failed-upload-1"))
+                .thenReturn(ImageUploadResult.of("https://example.com/failed2", "failed-upload-2"));
+        when(storage.deleteUploadCandidate("failed-upload-1"))
+                .thenThrow(new DeveryTimeException(ErrorCode.IMAGE_DELETE_FAILED)).thenReturn(true);
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+            service.uploadPostImages(postId, List.of(file(), file()), userId);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void beforeCommit(boolean readOnly) {
+                    throw new IllegalStateException("simulated commit phase failure");
+                }
+            });
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).isEmpty();
+        verify(storage).deleteUploadCandidate("failed-upload-1");
+        verify(storage).deleteUploadCandidate("failed-upload-2");
+        assertThat(pending.findByPostIdOrderById(postId)).singleElement()
+                .satisfies(record -> assertThat(record.isUploadCandidate()).isTrue());
+        new PostImageCleanupRetry(pending, cleanupService).retryPendingCleanup();
+        verify(storage, times(2)).deleteUploadCandidate("failed-upload-1");
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+    }
+
+    @Test
+    void retryPreservesUploadedFileWhenImageWasCommitted() {
+        service.uploadPostImages(postId, List.of(file()), userId);
+        cleanupService.recordUploadedFile(postId, "public-1");
+
+        new PostImageCleanupRetry(pending, cleanupService).retryPendingCleanup();
+
+        assertThat(pending.findByPostIdOrderById(postId)).isEmpty();
+        assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(1);
+        verify(storage, never()).deleteUploadCandidate("public-1");
+    }
+
+    @Test
+    void concurrentUploadsCannotExceedThreeImages() throws Exception {
+        when(storage.newPostImagePublicId()).thenReturn("new");
+        seedImage(0);
+        seedImage(1);
+        CountDownLatch firstUploadStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch secondRequestStarted = new CountDownLatch(1);
+        when(storage.uploadReservedPostImage(any(), anyString())).thenAnswer(invocation -> {
+            firstUploadStarted.countDown();
+            if (!releaseFirst.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("upload gate timed out");
+            }
+            return ImageUploadResult.of("https://example.com/new", "new");
+        });
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> service.uploadPostImages(postId, List.of(file()), userId));
+            assertThat(firstUploadStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            var second = executor.submit(() -> {
+                secondRequestStarted.countDown();
+                try {
+                    service.uploadPostImages(postId, List.of(file()), userId);
+                    return (ErrorCode) null;
+                } catch (DeveryTimeException failure) {
+                    return failure.getErrorCode();
+                }
+            });
+            assertThat(secondRequestStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            releaseFirst.countDown();
+            assertThat(first.get(5, TimeUnit.SECONDS)).hasSize(1);
+            assertThat(second.get(5, TimeUnit.SECONDS)).isEqualTo(ErrorCode.POST_IMAGE_LIMIT_EXCEEDED);
+            assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
+            verify(storage, times(1)).uploadReservedPostImage(any(), anyString());
+        } finally {
+            releaseFirst.countDown();
+            executor.shutdownNow();
+            executor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+    }
+
+    private void seedImage(int order) {
+        transaction.executeWithoutResult(status -> em.persist(new PostImage(
+                em.getReference(Post.class, postId), "https://example.com/existing", "existing", order)));
+    }
+
+    private MockMultipartFile file() {
+        return new MockMultipartFile("files", "image.png", "image/png", new byte[]{1});
+    }
+
+    private void assertError(Runnable action, ErrorCode expected) {
+        assertThatThrownBy(action::run).isInstanceOfSatisfying(DeveryTimeException.class,
+                failure -> assertThat(failure.getErrorCode()).isEqualTo(expected));
+    }
+
+    static class TestClock extends java.time.Clock {
+        volatile java.time.Clock delegate = java.time.Clock.systemDefaultZone();
+        public java.time.ZoneId getZone() { return delegate.getZone(); }
+        public java.time.Clock withZone(java.time.ZoneId zone) { return delegate.withZone(zone); }
+        public java.time.Instant instant() { return delegate.instant(); }
+    }
+
+    @Configuration
+    @EnableTransactionManagement
+    @EnableJpaRepositories(basePackageClasses = PostRepository.class)
+    static class Config {
+        @Bean
+        DataSource dataSource() {
+            return new DriverManagerDataSource(
+                    "jdbc:h2:mem:post-images;MODE=MySQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000", "sa", "");
+        }
+
+        @Bean
+        LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource dataSource) {
+            var factory = new LocalContainerEntityManagerFactoryBean();
+            factory.setDataSource(dataSource);
+            factory.setPackagesToScan("com.dms.deverytime.domain");
+            factory.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+            factory.setJpaPropertyMap(Map.of(
+                    "hibernate.hbm2ddl.auto", "create-drop",
+                    "hibernate.physical_naming_strategy",
+                    "org.hibernate.boot.model.naming.PhysicalNamingStrategySnakeCaseImpl"));
+            return factory;
+        }
+
+        @Bean
+        PlatformTransactionManager transactionManager(EntityManagerFactory factory) {
+            return new JpaTransactionManager(factory);
+        }
+
+        @Bean
+        ImageStorageService imageStorageService() {
+            return mock(ImageStorageService.class);
+        }
+
+        @Bean
+        TestClock testClock() { return new TestClock(); }
+
+        @Bean
+        PostImageCleanupService cleanupService(PostRepository posts,
+                                               PostImageCleanupRepository pending, PostImageRepository images,
+                                               ImageStorageService storage, TestClock clock) {
+            return new PostImageCleanupService(posts, pending, images, storage, clock);
+        }
+
+        @Bean
+        PostService postService(PostRepository posts, PostImageRepository images, ImageStorageService storage,
+                                PostImageCleanupRepository pending, PostImageCleanupService cleanup) {
+            return new PostService(posts, mock(UserRepository.class), mock(CategoryRepository.class),
+                    images, mock(PostViewLogRepository.class), mock(PostLikeRepository.class),
+                    storage, mock(CommentRepository.class), pending, cleanup);
+        }
+    }
+}

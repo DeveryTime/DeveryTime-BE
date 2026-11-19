@@ -41,7 +41,10 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
     // Cloudinary
-    implementation 'com.cloudinary:cloudinary-http5:2.0.0'
+    implementation 'com.cloudinary:cloudinary-http5:2.5.0'
+
+    // HTML5 named character references in Markdown
+    implementation 'org.jsoup:jsoup:1.21.2'
 
     // Apache Tika
     implementation 'org.apache.tika:tika-core:3.2.3'
