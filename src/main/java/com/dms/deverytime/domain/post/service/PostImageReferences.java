@@ -13,6 +13,8 @@ import java.util.regex.Pattern;
 // 본문을 한 번 준비해 삭제 및 정리 검사에서 재사용한다.
 final class PostImageReferences {
     private static final Pattern ENTITY = Pattern.compile("&(?:#[xX][0-9A-Fa-f]{1,8}|#[0-9]{1,8}|[A-Za-z][A-Za-z0-9]{1,31});");
+    // 스킴과 호스트는 대소문자를 구분하지 않으므로 소문자로 맞춘다. 경로는 구분하므로 그대로 둔다.
+    private static final Pattern SCHEME_AND_HOST = Pattern.compile("(?i)\\b(https?)://([^/?#\\s\"'<>)\\]]+)");
     private final List<String> texts = new ArrayList<>();
 
     static PostImageReferences from(String content) {
@@ -78,6 +80,17 @@ final class PostImageReferences {
             }
             result.append(c);
         }
+        return lowerCaseSchemeAndHost(result.toString());
+    }
+
+    private static String lowerCaseSchemeAndHost(String value) {
+        Matcher matcher = SCHEME_AND_HOST.matcher(value);
+        StringBuilder result = new StringBuilder(value.length());
+        while (matcher.find()) {
+            matcher.appendReplacement(result, Matcher.quoteReplacement(
+                    (matcher.group(1) + "://" + matcher.group(2)).toLowerCase(java.util.Locale.ROOT)));
+        }
+        matcher.appendTail(result);
         return result.toString();
     }
 
