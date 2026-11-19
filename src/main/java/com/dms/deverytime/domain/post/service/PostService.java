@@ -32,7 +32,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
@@ -55,6 +58,13 @@ public class PostService {
     private final CommentRepository commentRepository;
     private final PostImageCleanupRepository postImageCleanupRepository;
     private final PostImageCleanupService postImageCleanupService;
+    private TransactionTemplate transactionTemplate;
+
+    // 업로드 흐름에서 트랜잭션 경계를 직접 나누기 위해 사용한다. 생성자 시그니처는 유지한다.
+    @Autowired
+    void setTransactionManager(PlatformTransactionManager transactionManager) {
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+    }
 
     @Transactional
     public Long createPost(PostCreateRequest request, Long loginUserId) {
@@ -246,70 +256,114 @@ public class PostService {
     }
 
     // 게시글 이미지 업로드
-    @Transactional
+    // 외부 트랜잭션이 커넥션을 쥔 채 REQUIRES_NEW 커넥션을 기다리지 않도록 단계를 나눈다.
+    //  1) 짧은 트랜잭션으로 검증 -> 2) 트랜잭션 밖에서 정리 기록 예약 -> 3) 본 트랜잭션에서 업로드와 저장
     public List<PostImageResponse> uploadPostImages(Long postId, List<MultipartFile> files,
                                                    Long loginUserId) {
+        List<Long> cleanupIds = new ArrayList<>();
+        boolean joined = TransactionSynchronizationManager.isActualTransactionActive();
+        if (joined) {
+            registerUploadRollbackCleanup(cleanupIds);
+        }
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                lockOwnedPost(postId, loginUserId);
+                checkUploadable(postId, files);
+                // 잘못된 파일이 있으면 외부 저장소에 업로드하기 전에 전체 요청을 거절한다.
+                files.forEach(imageStorageService::validateImage);
+            });
+
+            List<String> publicIds = new ArrayList<>();
+            for (int i = 0; i < files.size(); i++) {
+                String publicId = imageStorageService.newPostImagePublicId();
+                cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, publicId));
+                publicIds.add(publicId);
+            }
+
+            return transactionTemplate.execute(status -> {
+                // 검증 이후 상태가 바뀔 수 있으므로 게시글 락을 잡은 뒤 다시 확인한다.
+                Post post = lockOwnedPost(postId, loginUserId);
+                List<PostImage> existingImages = checkUploadable(postId, files);
+                int nextOrder = existingImages.stream()
+                        .mapToInt(PostImage::getSortOrder)
+                        .max()
+                        .orElse(-1) + 1;
+
+                List<PostImageResponse> responses = new ArrayList<>();
+                for (int i = 0; i < files.size(); i++) {
+                    ImageUploadResult result = imageStorageService.uploadReservedPostImage(
+                            files.get(i), publicIds.get(i));
+                    PostImage image = postImageRepository.save(new PostImage(
+                            post, result.profileImageUrl(), result.profileImagePublicId(), nextOrder++));
+                    postImageCleanupRepository.findByIdForUpdate(cleanupIds.get(i)).orElseThrow().complete();
+                    responses.add(PostImageResponse.from(image));
+                }
+                return responses;
+            });
+        } catch (RuntimeException failure) {
+            if (!joined) {
+                cleanupRolledBackUploads(cleanupIds);
+            }
+            throw failure;
+        }
+    }
+
+    public PostImageResponse replacePostImage(Long postId, Long imageId, MultipartFile file, Long loginUserId) {
+        List<Long> cleanupIds = new ArrayList<>();
+        boolean joined = TransactionSynchronizationManager.isActualTransactionActive();
+        if (joined) {
+            registerUploadRollbackCleanup(cleanupIds);
+        }
+        try {
+            transactionTemplate.executeWithoutResult(status -> {
+                lockOwnedPost(postId, loginUserId);
+                findPostImage(postId, imageId);
+                imageStorageService.validateImage(file);
+            });
+
+            String publicId = imageStorageService.newPostImagePublicId();
+            cleanupIds.add(postImageCleanupService.recordUploadedFile(postId, publicId));
+
+            return transactionTemplate.execute(status -> {
+                lockOwnedPost(postId, loginUserId);
+                PostImage image = findPostImage(postId, imageId);
+                ImageUploadResult result = imageStorageService.uploadReservedPostImage(file, publicId);
+
+                // 편집 중인 클라이언트가 이전 URL을 아직 사용할 수 있으므로 본문 저장 전에는 보존한다.
+                postImageCleanupRepository.save(new PostImageCleanup(postId, image));
+                image.replaceFile(result.profileImageUrl(), result.profileImagePublicId());
+                postImageCleanupRepository.findByIdForUpdate(cleanupIds.get(0)).orElseThrow().complete();
+                return PostImageResponse.from(image);
+            });
+        } catch (RuntimeException failure) {
+            if (!joined) {
+                cleanupRolledBackUploads(cleanupIds);
+            }
+            throw failure;
+        }
+    }
+
+    private Post lockOwnedPost(Long postId, Long loginUserId) {
         Post post = postRepository.findByIdForImageUpload(postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
-
         validatePostOwner(post, loginUserId);
+        return post;
+    }
 
+    private List<PostImage> checkUploadable(Long postId, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
             throw new DeveryTimeException(ErrorCode.INVALID_IMAGE_FILE);
         }
-
         List<PostImage> existingImages = postImageRepository.findByPostIdOrderBySortOrder(postId);
         if (files.size() > MAX_POST_IMAGES - existingImages.size()) {
             throw new DeveryTimeException(ErrorCode.POST_IMAGE_LIMIT_EXCEEDED);
         }
-
-        // 잘못된 파일이 있으면 외부 저장소에 업로드하기 전에 전체 요청을 거절한다.
-        files.forEach(imageStorageService::validateImage);
-
-        int nextOrder = existingImages.stream()
-                .mapToInt(PostImage::getSortOrder)
-                .max()
-                .orElse(-1) + 1;
-        List<Long> cleanupIds = new ArrayList<>();
-        registerUploadRollbackCleanup(postId, cleanupIds);
-
-        List<PostImageResponse> responses = new ArrayList<>();
-        for (MultipartFile file : files) {
-            String publicId = imageStorageService.newPostImagePublicId();
-            Long cleanupId = postImageCleanupService.recordUploadedFile(postId, publicId);
-            cleanupIds.add(cleanupId);
-            ImageUploadResult result = imageStorageService.uploadReservedPostImage(file, publicId);
-            PostImage image = postImageRepository.save(new PostImage(
-                    post, result.profileImageUrl(), result.profileImagePublicId(), nextOrder++));
-            // 별도 트랜잭션에서 만든 기록을 현재 트랜잭션에서 읽고 함께 확정한다.
-            postImageCleanupRepository.findByIdForUpdate(cleanupId).orElseThrow().complete();
-            responses.add(PostImageResponse.from(image));
-        }
-
-        return responses;
+        return existingImages;
     }
 
-    @Transactional
-    public PostImageResponse replacePostImage(Long postId, Long imageId, MultipartFile file, Long loginUserId) {
-        Post post = postRepository.findByIdForImageUpload(postId)
-                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
-        validatePostOwner(post, loginUserId);
-        PostImage image = postImageRepository.findByIdAndPostId(imageId, postId)
+    private PostImage findPostImage(Long postId, Long imageId) {
+        return postImageRepository.findByIdAndPostId(imageId, postId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_IMAGE_NOT_FOUND));
-        imageStorageService.validateImage(file);
-
-        List<Long> cleanupIds = new ArrayList<>();
-        registerUploadRollbackCleanup(postId, cleanupIds);
-        String publicId = imageStorageService.newPostImagePublicId();
-        Long cleanupId = postImageCleanupService.recordUploadedFile(postId, publicId);
-        cleanupIds.add(cleanupId);
-        ImageUploadResult result = imageStorageService.uploadReservedPostImage(file, publicId);
-
-        // 편집 중인 클라이언트가 이전 URL을 아직 사용할 수 있으므로 본문 저장 전에는 보존한다.
-        postImageCleanupRepository.save(new PostImageCleanup(postId, image));
-        image.replaceFile(result.profileImageUrl(), result.profileImagePublicId());
-        postImageCleanupRepository.findByIdForUpdate(cleanupId).orElseThrow().complete();
-        return PostImageResponse.from(image);
     }
 
     private void registerReplacedImageCleanup(Long postId) {
@@ -326,8 +380,8 @@ public class PostService {
         });
     }
 
-    private void registerUploadRollbackCleanup(Long postId, List<Long> cleanupIds) {
-        // 메서드 내부 예외뿐 아니라 트랜잭션 커밋 실패에 의한 롤백도 처리한다.
+    // 호출자의 트랜잭션에 합류한 경우에만 사용한다. 직접 트랜잭션을 연 경우는 종료 후 호출부에서 정리한다.
+    private void registerUploadRollbackCleanup(List<Long> cleanupIds) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
@@ -336,16 +390,20 @@ public class PostService {
                             cleanupIds);
                 }
                 if (status == STATUS_ROLLED_BACK) {
-                    for (Long cleanupId : cleanupIds) {
-                        try {
-                            postImageCleanupService.cleanupRolledBackUpload(cleanupId);
-                        } catch (RuntimeException cleanupFailure) {
-                            log.error("Rolled-back image cleanup retained for retry: {}", cleanupId, cleanupFailure);
-                        }
-                    }
+                    cleanupRolledBackUploads(cleanupIds);
                 }
             }
         });
+    }
+
+    private void cleanupRolledBackUploads(List<Long> cleanupIds) {
+        for (Long cleanupId : cleanupIds) {
+            try {
+                postImageCleanupService.cleanupRolledBackUpload(cleanupId);
+            } catch (RuntimeException cleanupFailure) {
+                log.error("Rolled-back image cleanup retained for retry: {}", cleanupId, cleanupFailure);
+            }
+        }
     }
 
 }
