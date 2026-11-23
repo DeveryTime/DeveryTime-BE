@@ -67,11 +67,11 @@ class PostImageUploadControllerTest {
                         .content("{\"title\":\"title\",\"content\":\"text\",\"deleteImageIds\":[21,22]}"))
                 .andExpect(status().isOk());
         verify(service).updatePost(eq(10L), argThat(request ->
-                List.of(21L, 22L).equals(request.getDeleteImageIds())), eq(5L));
+                List.of(21L, 22L).equals(request.deleteImageIds())), eq(5L));
         mvc.perform(put("/api/posts/10").contentType("application/json")
                         .content("{\"title\":\"title\",\"content\":\"text\"}"))
                 .andExpect(status().isOk());
-        verify(service).updatePost(eq(10L), argThat(request -> request.getDeleteImageIds() == null), eq(5L));
+        verify(service).updatePost(eq(10L), argThat(request -> request.deleteImageIds() == null), eq(5L));
     }
 
     @Test

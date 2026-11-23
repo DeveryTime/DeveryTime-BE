@@ -5,7 +5,7 @@ import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.entity.PostImage;
 import com.dms.deverytime.domain.post.repository.PostImageRepository;
 import com.dms.deverytime.domain.post.repository.PostImageCleanupRepository;
@@ -231,8 +231,8 @@ class PostImageUploadTest {
         List<PostImageResponse> response = service.uploadPostImages(postId,
                 List.of(file(), file(), file()), userId);
 
-        assertThat(response).extracting(PostImageResponse::getSortOrder).containsExactly(0, 1, 2);
-        assertThat(response).extracting(PostImageResponse::getId).doesNotContainNull();
+        assertThat(response).extracting(PostImageResponse::sortOrder).containsExactly(0, 1, 2);
+        assertThat(response).extracting(PostImageResponse::id).doesNotContainNull();
         assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
         verify(storage, never()).delete(anyString());
     }
@@ -241,7 +241,7 @@ class PostImageUploadTest {
     void appendsAfterExistingMaximumOrder() {
         seedImage(4);
         seedImage(8);
-        assertThat(service.uploadPostImages(postId, List.of(file()), userId).get(0).getSortOrder())
+        assertThat(service.uploadPostImages(postId, List.of(file()), userId).get(0).sortOrder())
                 .isEqualTo(9);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).hasSize(3);
     }

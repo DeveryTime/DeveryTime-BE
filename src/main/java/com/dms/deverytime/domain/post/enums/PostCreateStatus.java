@@ -1,4 +1,4 @@
-package com.dms.deverytime.domain.post.entity;
+package com.dms.deverytime.domain.post.enums;
 
 public enum PostCreateStatus {
     DRAFT, //임시저장

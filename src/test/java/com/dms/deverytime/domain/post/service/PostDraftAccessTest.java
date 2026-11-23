@@ -4,6 +4,7 @@ import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.entity.*;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.repository.*;
 import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
 import com.dms.deverytime.domain.user.entity.User;
@@ -56,7 +57,7 @@ class PostDraftAccessTest {
     @Test
     void authorCanReadDraft() {
         when(views.existsByPostIdAndUserId(10L, 5L)).thenReturn(true);
-        assertThat(service.getPostDetail(10L, 5L).getContent()).isEqualTo("secret");
+        assertThat(service.getPostDetail(10L, 5L).content()).isEqualTo("secret");
     }
 
     @Test
@@ -65,7 +66,7 @@ class PostDraftAccessTest {
         User viewer = User.builder().username("viewer").build();
         ReflectionTestUtils.setField(viewer, "id", 6L);
         when(users.findById(6L)).thenReturn(Optional.of(viewer));
-        assertThat(service.getPostDetail(10L, 6L).getViewCount()).isEqualTo(1);
+        assertThat(service.getPostDetail(10L, 6L).viewCount()).isEqualTo(1);
         verify(views).save(any(PostViewLog.class));
     }
 }

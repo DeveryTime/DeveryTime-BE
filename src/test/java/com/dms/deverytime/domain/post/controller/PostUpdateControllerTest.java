@@ -1,7 +1,7 @@
 package com.dms.deverytime.domain.post.controller;
 
 import com.dms.deverytime.domain.post.dto.response.PostUpdateResponse;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.service.PostService;
 import com.dms.deverytime.global.exception.GlobalExceptionHandler;
 import com.dms.deverytime.global.security.auth.CustomUserDetails;
@@ -56,9 +56,9 @@ class PostUpdateControllerTest {
                 .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
                 .andExpect(jsonPath("$.data.updatedAt").value("2026-11-15T12:00:00"))
                 .andExpect(jsonPath("$.message").value("게시글이 수정되었습니다."));
-        verify(service).updatePost(eq(10L), argThat(request -> request.getCategoryId().equals(3L)
-                && request.getStatus() == PostCreateStatus.PUBLISHED
-                && List.of(21L, 22L).equals(request.getDeleteImageIds())), eq(5L));
+        verify(service).updatePost(eq(10L), argThat(request -> request.categoryId().equals(3L)
+                && request.status() == PostCreateStatus.PUBLISHED
+                && List.of(21L, 22L).equals(request.deleteImageIds())), eq(5L));
     }
 
     @Test
@@ -66,8 +66,8 @@ class PostUpdateControllerTest {
         mvc.perform(put("/api/posts/10").contentType("application/json")
                         .content("{\"title\":\"title\",\"content\":\"text\"}"))
                 .andExpect(status().isOk());
-        verify(service).updatePost(eq(10L), argThat(request -> request.getCategoryId() == null
-                && request.getStatus() == null), eq(5L));
+        verify(service).updatePost(eq(10L), argThat(request -> request.categoryId() == null
+                && request.status() == null), eq(5L));
     }
 
     @Test
