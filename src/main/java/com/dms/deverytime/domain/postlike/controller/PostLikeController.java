@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/posts/{postId}/likes")
 @RequiredArgsConstructor
 public class PostLikeController {
+
     private final PostLikeService postLikeService;
 
     @PostMapping
