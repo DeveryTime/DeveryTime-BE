@@ -15,6 +15,7 @@ public interface PostImageCleanupRepository extends JpaRepository<PostImageClean
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM PostImageCleanup c WHERE c.id = :id")
     Optional<PostImageCleanup> findByIdForUpdate(@Param("id") Long id);
+
     @Query("SELECT c FROM PostImageCleanup c WHERE c.postId = :postId AND c.completed = false ORDER BY c.id")
     List<PostImageCleanup> findByPostIdOrderById(@Param("postId") Long postId);
 
