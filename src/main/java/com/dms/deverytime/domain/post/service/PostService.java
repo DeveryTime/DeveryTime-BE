@@ -9,7 +9,7 @@ import com.dms.deverytime.domain.post.dto.response.PostDetailResponse;
 import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.dto.response.PostListResponse;
 import com.dms.deverytime.domain.post.dto.response.PostUpdateResponse;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.entity.PostImage;
 import com.dms.deverytime.domain.post.entity.PostImageCleanup;
@@ -75,11 +75,11 @@ public class PostService {
 
         Category category = categoryRepository
                 //위와 같이 카테고리 찾고 없으면 없다는 에러코드
-                .findById(request.getCategoryId())
+                .findById(request.categoryId())
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.CATEGORY_NOT_FOUND));
 
         //검증된 user, category값과 사용자가 적어 보낸 값으로 post 구성
-        Post post = new Post(user, category, request.getTitle(), request.getContent(), request.getStatus());
+        Post post = new Post(user, category, request.title(), request.content(), request.status());
 
         return postRepository.save(post).getId();
     }
@@ -92,14 +92,7 @@ public class PostService {
                 ? postRepository.findByCategoryIdWithCategory(categoryId, pageable)
                 : postRepository.findAllWithCategory(pageable);
 
-        return posts.map(post -> new PostListResponse(
-                post.getId(),
-                post.getTitle(),
-                post.getUser().getId(),
-                post.getCategory().getName(), // ← 주의: category는 LAZY라서 여기서 실제 쿼리가 나감 (N+1 위험 지점)
-                post.getCreatedAt(),
-                post.getLikeCount()
-        ));
+        return posts.map(PostListResponse::from);
     }
 
     @Transactional
@@ -132,7 +125,7 @@ public class PostService {
                 .stream()
                 .map(PostImageResponse::from)
                 .toList();
-        List<String> imageUrls = images.stream().map(PostImageResponse::getImageUrl).toList();
+        List<String> imageUrls = images.stream().map(PostImageResponse::imageUrl).toList();
 
         long likeCount = postLikeRepository.countByPostId(id);
 
@@ -140,23 +133,7 @@ public class PostService {
                 postLikeRepository.existsByPostIdAndUserId(id, loginUserId);
 
         // DTO로 변환
-        return new PostDetailResponse(
-                post.getId(),
-                post.getTitle(),
-                post.getContent(),
-                post.getStatus(),
-                post.getViewCount(),
-                post.getUser().getId(),
-                post.getUser().getUsername(),
-                post.getUser().getProfileImageUrl(),
-                post.getCategory().getName(),
-                imageUrls,
-                images,
-                post.getCreatedAt(),
-                post.getUpdatedAt(),
-                likeCount,
-                liked
-        );
+        return PostDetailResponse.from(post, imageUrls,images, likeCount, liked);
     }
 
     // update, delete id 비교 검증 전용 메서드
@@ -174,12 +151,12 @@ public class PostService {
 
         validatePostOwner(post, loginUserId);
 
-        Category category = request.getCategoryId() == null ? post.getCategory()
-                : categoryRepository.findById(request.getCategoryId())
+        Category category = request.categoryId() == null ? post.getCategory()
+                : categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.CATEGORY_NOT_FOUND));
-        PostCreateStatus status = request.getStatus() == null ? post.getStatus() : request.getStatus();
+        PostCreateStatus status = request.status() == null ? post.getStatus() : request.status();
 
-        PostImageReferences references = PostImageReferences.from(request.getContent());
+        PostImageReferences references = PostImageReferences.from(request.content());
 
         // 이미 본문에서 제거한 이전 파일 URL은 뒤늦은 편집 요청으로 되살릴 수 없다.
         for (PostImageCleanup retired : postImageCleanupRepository.findByPostIdAndRetiredTrue(postId)) {
@@ -189,8 +166,8 @@ public class PostService {
         }
 
         List<PostImage> deletedImages = new ArrayList<>();
-        if (request.getDeleteImageIds() != null) {
-            for (Long imageId : request.getDeleteImageIds().stream().distinct().toList()) {
+        if (request.deleteImageIds() != null) {
+            for (Long imageId : request.deleteImageIds().stream().distinct().toList()) {
                 PostImage image = postImageRepository.findByIdAndPostId(imageId, postId)
                         .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_IMAGE_NOT_FOUND));
                 deletedImages.add(image);
@@ -223,7 +200,7 @@ public class PostService {
             cleanup.retire();
         }
 
-        post.update(request.getTitle(), request.getContent(), category, status);
+        post.update(request.title(), request.content(), category, status);
         // @PreUpdate로 확정된 수정 시각을 응답에 담는다.
         postRepository.flush();
         registerReplacedImageCleanup(postId);

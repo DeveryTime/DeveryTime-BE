@@ -1,23 +1,22 @@
 package com.dms.deverytime.domain.search.dto.response;
 
-import lombok.Getter;
 import org.springframework.data.domain.Page;
-
 import java.util.List;
 
-@Getter
-public class PageResponse<T> {
-    private final List<T> content;
-    private final long totalElements;
-    private final int totalPages;
-    private final int number;
-    private final int size;
-
-    public PageResponse(Page<T> page) {
-        this.content = page.getContent();
-        this.totalElements = page.getTotalElements();
-        this.totalPages = page.getTotalPages();
-        this.number = page.getNumber();
-        this.size = page.getSize();
+public record PageResponse<T>(
+        List<T> content,
+        long totalElements,
+        int totalPages,
+        int number,
+        int size
+) {
+    public static <T> PageResponse<T> from(Page<T> page) {
+        return new PageResponse<>(
+                page.getContent(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.getNumber(),
+                page.getSize()
+        );
     }
 }

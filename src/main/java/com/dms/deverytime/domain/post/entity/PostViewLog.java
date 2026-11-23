@@ -1,9 +1,9 @@
 package com.dms.deverytime.domain.post.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import java.time.LocalDateTime;
 
 import com.dms.deverytime.domain.user.entity.User;
 
@@ -14,7 +14,7 @@ import com.dms.deverytime.domain.user.entity.User;
         name = "post_view_log",
         uniqueConstraints = @UniqueConstraint(columnNames = {"post_id", "user_id"}))
 @Getter
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PostViewLog {
 
     @Id

@@ -17,7 +17,6 @@ import com.dms.deverytime.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 
@@ -25,6 +24,7 @@ import java.util.List;
 @Transactional
 @RequiredArgsConstructor
 public class CommentService {
+
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -43,13 +43,13 @@ public class CommentService {
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
-        return new CommentCreateResponse(savedComment.getId(), post.getId(), user.getId(), savedComment.getContent(), savedComment.getCreatedAt()
-        );
+        return CommentCreateResponse.from(savedComment);
     }
 
     public List<CommentListResponse> getCommentList(Long postId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postRepository.existsById(postId))
+            throw new DeveryTimeException(ErrorCode.POST_NOT_FOUND);
 
         List<Comment> comments = commentRepository.findAllByPostIdWithUser(postId);
 
@@ -60,28 +60,24 @@ public class CommentService {
     }
 
     public CommentUpdateResponse updateComment(Long postId, Long commentId, Long userId, CommentUpdateRequest request) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postRepository.existsById(postId))
+            throw new DeveryTimeException(ErrorCode.POST_NOT_FOUND);
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
 
         validateCommentAccess(comment, postId, userId);
-
         comment.updateContent(request.content());
 
         commentRepository.flush();
-
-        return new CommentUpdateResponse(
-                comment.getId(),
-                comment.getContent(),
-                comment.getUpdatedAt()
-        );
+        return CommentUpdateResponse.from(comment);
     }
 
     public void deleteComment(Long postId, Long commentId, Long userId) {
-        Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new DeveryTimeException(ErrorCode.POST_NOT_FOUND));
+
+        if (!postRepository.existsById(postId))
+            throw new DeveryTimeException(ErrorCode.POST_NOT_FOUND);
 
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND));
@@ -92,6 +88,7 @@ public class CommentService {
     }
 
     private void validateCommentAccess(Comment comment, Long postId, Long userId) {
+
         if (!comment.getPost().getId().equals(postId)) {
             throw new DeveryTimeException(ErrorCode.COMMENT_NOT_FOUND);
         }

@@ -5,7 +5,7 @@ import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.dto.request.PostCreateRequest;
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.repository.*;
 import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
 import com.dms.deverytime.domain.user.entity.User;
@@ -37,11 +37,7 @@ class PostMarkdownContentTest {
                 mock(PostViewLogRepository.class), mock(PostLikeRepository.class), mock(ImageStorageService.class),
                 mock(CommentRepository.class), mock(PostImageCleanupRepository.class), mock(PostImageCleanupService.class));
         String markdown = "## 제목\n\n**굵게**, *기울임*, <u>밑줄</u>\n\n[링크](https://example.com)\n![사진](https://example.com/a.png)";
-        var request = new PostCreateRequest();
-        request.setCategoryId(3L);
-        request.setTitle("title");
-        request.setContent(markdown);
-        request.setStatus(PostCreateStatus.PUBLISHED);
+        var request = new PostCreateRequest(3L, "title", markdown, PostCreateStatus.PUBLISHED);
         assertThat(service.createPost(request, 5L)).isEqualTo(10L);
         var saved = ArgumentCaptor.forClass(Post.class);
         verify(posts).save(saved.capture());

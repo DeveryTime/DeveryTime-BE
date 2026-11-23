@@ -1,9 +1,10 @@
 package com.dms.deverytime.domain.post.entity;
 
 import com.dms.deverytime.domain.category.entity.Category;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.user.entity.User;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
@@ -13,7 +14,7 @@ import org.hibernate.annotations.DynamicUpdate;
 @Table(name = "post")
 
 // 파라미터 X 기본 생성자를 자동 생성
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 // 이 클래스가 DB 테이블과 매핑되는 객체임을 선언
 @Entity
 @DynamicUpdate

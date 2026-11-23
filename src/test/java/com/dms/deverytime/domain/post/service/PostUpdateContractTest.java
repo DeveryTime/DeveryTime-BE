@@ -5,6 +5,7 @@ import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.entity.*;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.repository.*;
 import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
 import com.dms.deverytime.domain.user.entity.User;
@@ -24,7 +25,6 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.jpa.*;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -93,9 +93,8 @@ class PostUpdateContractTest {
             var viewing = executor.submit(() -> tx.executeWithoutResult(s ->
                     viewingService.getPostDetail(postId, userId)));
             assertThat(readStarted.await(10, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            var edit = request(newCategoryId, PostCreateStatus.DRAFT);
-            ReflectionTestUtils.setField(edit, "title", "private title");
-            ReflectionTestUtils.setField(edit, "content", "private content");
+            var edit = new PostUpdateRequest(newCategoryId, PostCreateStatus.DRAFT, "private title",
+                    "private content", null);
             service.updatePost(postId, edit, userId);
             finishRead.countDown();
             viewing.get(10, java.util.concurrent.TimeUnit.SECONDS);
@@ -134,9 +133,9 @@ class PostUpdateContractTest {
     @Test
     void publishesDraftChangesCategoryAndDeletesPhotoInOneSave() {
         Long imageId = addPhoto();
-        var request = deletionRequest(newCategoryId, PostCreateStatus.PUBLISHED, imageId);
         String markdown = "## 제목\n\n**사진을 제거한 본문**";
-        ReflectionTestUtils.setField(request, "content", markdown);
+        var request = new PostUpdateRequest(newCategoryId, PostCreateStatus.PUBLISHED, "updated", markdown,
+                List.of(imageId));
 
         var response = service.updatePost(postId, request, userId);
 
@@ -225,8 +224,7 @@ class PostUpdateContractTest {
         assertThat(posts.findByCategoryIdWithCategory(originalCategoryId, pageable)).isEmpty();
         assertThat(posts.findByTitleContainingWithCategory(keyword, pageable)).isEmpty();
         assertThat(posts.findAllByUser_Id(userId, pageable)).extracting(Post::getId).containsExactly(postId);
-        var request = request(null, PostCreateStatus.PUBLISHED);
-        ReflectionTestUtils.setField(request, "title", keyword);
+        var request = new PostUpdateRequest(null, PostCreateStatus.PUBLISHED, keyword, "updated content", null);
         service.updatePost(postId, request, userId);
         assertThat(posts.findByCategoryIdWithCategory(originalCategoryId, pageable)).extracting(Post::getId)
                 .containsExactly(postId);
@@ -236,18 +234,11 @@ class PostUpdateContractTest {
     }
 
     private PostUpdateRequest request(Long categoryId, PostCreateStatus status) {
-        var request = new PostUpdateRequest();
-        ReflectionTestUtils.setField(request, "title", "updated");
-        ReflectionTestUtils.setField(request, "content", "updated content");
-        ReflectionTestUtils.setField(request, "categoryId", categoryId);
-        ReflectionTestUtils.setField(request, "status", status);
-        return request;
+        return new PostUpdateRequest(categoryId, status, "updated", "updated content", null);
     }
 
     private PostUpdateRequest deletionRequest(Long categoryId, PostCreateStatus status, Long imageId) {
-        var request = request(categoryId, status);
-        ReflectionTestUtils.setField(request, "deleteImageIds", List.of(imageId));
-        return request;
+        return new PostUpdateRequest(categoryId, status, "updated", "updated content", List.of(imageId));
     }
 
     private Long addPhoto() {
