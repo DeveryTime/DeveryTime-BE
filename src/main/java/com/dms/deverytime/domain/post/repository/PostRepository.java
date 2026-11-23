@@ -20,11 +20,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Optional<Post> findByIdForImageUpload(@Param("id") Long id);
 
     //게시글이랑 카테고리를 한번에 가져옴 (N+1 문제 해결)
-    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.status = com.dms.deverytime.domain.post.entity.PostCreateStatus.PUBLISHED")
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.status = com.dms.deverytime.domain.post.enums.PostCreateStatus.PUBLISHED")
     Page<Post> findAllWithCategory(Pageable pageable);
 
 
-    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.category.id = :categoryId AND p.status = com.dms.deverytime.domain.post.entity.PostCreateStatus.PUBLISHED")
+    @Query("SELECT p FROM Post p JOIN FETCH p.category WHERE p.category.id = :categoryId AND p.status = com.dms.deverytime.domain.post.enums.PostCreateStatus.PUBLISHED")
     Page<Post> findByCategoryIdWithCategory(@Param("categoryId") Long categoryId, Pageable pageable);
 
     // 특정 사용자가 작성한 게시글 조회
@@ -33,7 +33,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // LIKE %:keyword%로 keyword가 title 안에 포함돼 있으면 매치
     // JOIN FETCH p.user: getUser().getProfileImageUrl() 호출 시 게시글마다 User 쿼리가 나가는 N+1 방지
-    @Query("SELECT p FROM Post p JOIN FETCH p.category JOIN FETCH p.user WHERE p.title LIKE %:keyword% AND p.status = com.dms.deverytime.domain.post.entity.PostCreateStatus.PUBLISHED")
+    @Query("SELECT p FROM Post p JOIN FETCH p.category JOIN FETCH p.user WHERE p.title LIKE %:keyword% AND p.status = com.dms.deverytime.domain.post.enums.PostCreateStatus.PUBLISHED")
     Page<Post> findByTitleContainingWithCategory(@Param("keyword") String keyword, Pageable pageable);
 
 }
