@@ -1,7 +1,7 @@
 package com.dms.deverytime.domain.post.dto.response;
 
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import java.time.LocalDateTime;
 
 public record PostUpdateResponse(Long id, String title, PostCreateStatus status, LocalDateTime updatedAt) {
