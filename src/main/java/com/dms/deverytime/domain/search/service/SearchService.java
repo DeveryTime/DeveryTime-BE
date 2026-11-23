@@ -1,6 +1,5 @@
 package com.dms.deverytime.domain.search.service;
 
-import com.dms.deverytime.domain.post.dto.response.PostListResponse;
 import com.dms.deverytime.domain.post.entity.Post;
 import com.dms.deverytime.domain.post.repository.PostRepository;
 import com.dms.deverytime.domain.search.dto.request.PostSearchRequest;
@@ -41,7 +40,7 @@ public class SearchService {
 
         Page<PostSearchInfo> mappedPosts = posts.map(PostSearchInfo::from);
 
-        PageResponse<PostSearchInfo> postPage = new PageResponse<>(mappedPosts);
+        PageResponse<PostSearchInfo> postPage = PageResponse.from(mappedPosts);
 
         return new SearchResponse(userInfos, postPage);
     }

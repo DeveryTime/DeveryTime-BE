@@ -5,7 +5,7 @@ import com.dms.deverytime.domain.category.repository.CategoryRepository;
 import com.dms.deverytime.domain.comment.repository.CommentRepository;
 import com.dms.deverytime.domain.post.dto.response.PostImageResponse;
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.entity.PostImage;
 import com.dms.deverytime.domain.post.repository.*;
 import com.dms.deverytime.domain.postlike.repository.PostLikeRepository;
@@ -45,14 +45,14 @@ class PostDetailImagesTest {
                 mock(CommentRepository.class), mock(PostImageCleanupRepository.class), mock(PostImageCleanupService.class));
 
         var response = service.getPostDetail(10L, 5L);
-        assertThat(response.getContent()).isEqualTo(markdown);
-        assertThat(response.getImageUrls()).containsExactly("https://example.com/a", "https://example.com/b");
-        assertThat(response.getImages()).extracting(PostImageResponse::getId).containsExactly(21L, 22L);
-        assertThat(response.getImages()).extracting(PostImageResponse::getSortOrder).containsExactly(0, 1);
+        assertThat(response.content()).isEqualTo(markdown);
+        assertThat(response.imageUrls()).containsExactly("https://example.com/a", "https://example.com/b");
+        assertThat(response.images()).extracting(PostImageResponse::id).containsExactly(21L, 22L);
+        assertThat(response.images()).extracting(PostImageResponse::sortOrder).containsExactly(0, 1);
 
         when(images.findByPostIdOrderBySortOrder(10L)).thenReturn(List.of());
         var empty = service.getPostDetail(10L, 5L);
-        assertThat(empty.getImages()).isEmpty();
-        assertThat(empty.getImageUrls()).isEmpty();
+        assertThat(empty.images()).isEmpty();
+        assertThat(empty.imageUrls()).isEmpty();
     }
 }

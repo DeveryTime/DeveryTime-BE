@@ -3,7 +3,7 @@ package com.dms.deverytime.domain.post.service;
 import com.dms.deverytime.domain.category.entity.Category;
 import com.dms.deverytime.domain.post.dto.request.PostUpdateRequest;
 import com.dms.deverytime.domain.post.entity.Post;
-import com.dms.deverytime.domain.post.entity.PostCreateStatus;
+import com.dms.deverytime.domain.post.enums.PostCreateStatus;
 import com.dms.deverytime.domain.post.entity.PostImage;
 import com.dms.deverytime.domain.post.repository.PostImageCleanupRepository;
 import com.dms.deverytime.domain.post.repository.PostImageRepository;
@@ -22,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.orm.jpa.SharedEntityManagerCreator;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -382,9 +381,9 @@ class PostImageReplacementTest {
         });
         var response = service.replacePostImage(postId, imageId, file(), userId);
 
-        assertThat(response.getId()).isEqualTo(imageId);
-        assertThat(response.getSortOrder()).isEqualTo(4);
-        assertThat(response.getImageUrl()).isEqualTo(NEW_URL);
+        assertThat(response.id()).isEqualTo(imageId);
+        assertThat(response.sortOrder()).isEqualTo(4);
+        assertThat(response.imageUrl()).isEqualTo(NEW_URL);
         assertThat(images.findByPostIdOrderBySortOrder(postId)).extracting(PostImage::getPublicId)
                 .containsExactly("new-file", "second", "third");
         assertThat(pending.findByPostIdOrderById(postId)).hasSize(1);
@@ -803,9 +802,7 @@ class PostImageReplacementTest {
     }
 
     private PostUpdateRequest deletionRequest(String content, Long... ids) {
-        PostUpdateRequest request = request(content);
-        ReflectionTestUtils.setField(request, "deleteImageIds", List.of(ids));
-        return request;
+        return new PostUpdateRequest(null, null, "updated", content, List.of(ids));
     }
 
     private String savedContent() {
@@ -817,10 +814,7 @@ class PostImageReplacementTest {
     }
 
     private PostUpdateRequest request(String content) {
-        var request = new PostUpdateRequest();
-        ReflectionTestUtils.setField(request, "title", "updated");
-        ReflectionTestUtils.setField(request, "content", content);
-        return request;
+        return new PostUpdateRequest(null, null, "updated", content, null);
     }
 
     private MockMultipartFile file() {
