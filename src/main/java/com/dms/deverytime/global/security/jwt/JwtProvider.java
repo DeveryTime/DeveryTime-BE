@@ -72,6 +72,9 @@ public class JwtProvider {
     }
 
     public Authentication getAuthentication(String token){
+
+        validateAccessToken(token);
+
         Long userId = getUserId(token);
         UserDetails userDetails =
                 customUserDetailsService.loadUserByUsername(userId.toString());
@@ -86,6 +89,13 @@ public class JwtProvider {
 
         return expiration.toInstant()
                 .atZone(ZoneId.of("Asia/Seoul")).toLocalDateTime();
+    }
+
+    public void validateAccessToken(String token){
+        String type = getClaims(token).get("type", String.class);
+
+        if (!ACCESS_TOKEN.equals(type))
+            throw new DeveryTimeException(ErrorCode.TOKEN_INVALID);
     }
 
     public void validateRefreshToken(String token){
